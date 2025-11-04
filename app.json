@@ -2,6 +2,7 @@
   "expo": {
     "name": "speakNext",
     "slug": "speakNext",
+    "scheme": "speaknext",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,17 +14,30 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.albusbrayn1.speakNext"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.albusbrayn1.speakNext"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "owner": "albusbrayn1",
+    "extra": {
+      "eas": {
+        "projectId": "31234170-7ae4-473d-bf3d-53ddfc547668"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-apple-authentication"
+    ]
   }
 }
