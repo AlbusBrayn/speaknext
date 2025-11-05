@@ -10,6 +10,8 @@ import BlankSplash from "../../screens/BlankSplash";
 //import SpeakingStartScreen from "../../screens/speakingScreens/speakingStart";
 //import DeleteAccountScreen from "../../screens/profileScreen/delete";
 import ProfileScreen from "../../screens/profile";
+import GrammarScreen from "../../screens/grammar"; 
+
 
 
 
@@ -24,7 +26,7 @@ const MainNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={screenOptions}
-      initialRouteName="HomeDashboardScreen"
+      initialRouteName="GrammarScreen"
     >
       
 
@@ -33,6 +35,7 @@ const MainNavigator = () => {
       <Stack.Screen name="BlankSplash" component={BlankSplash} />
       <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
       <Stack.Screen name="HomeDashboardScreen" component={HomeDashboardScreen} />
+      <Stack.Screen name="GrammarScreen" component={GrammarScreen} />
 
 
 

@@ -6,21 +6,51 @@ import {
   StatusBar,
   ScrollView,
   StyleSheet,
+  Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { logoutThisDevice } from '../../api/bac/authservice'; // 🔹 logout fonksiyonunu import ettik
 
 import ProfileHeader from '../../component/profile/ProfileHeader';
 import PremiumCard from '../../component/profile/PremiumCard';
 import ActionsList from '../../component/profile/ActionsList';
 
 const ProfileScreen = () => {
-  // Örnek user bilgisi (normalde Context veya API’den gelir)
+  const navigation = useNavigation();
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logoutThisDevice(); // 🔹 backend + SecureStore temizliği
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'LoginScreen' }], // 🔹 login sayfasına dön
+              });
+            } catch (err) {
+              console.log('Logout error:', err);
+              Alert.alert('Error', 'Something went wrong while logging out.');
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   const user = {
     name: 'John Doe',
     email: 'john@example.com',
-    avatarUrl: null, // varsa profil resmi URL’si
+    avatarUrl: null,
   };
 
-  // Eylem listesi
   const actionItems = [
     {
       id: 'subscription',
@@ -51,7 +81,7 @@ const ProfileScreen = () => {
       title: 'Log Out',
       icon: '🚪',
       destructive: true,
-      onPress: () => console.log('Logout'),
+      onPress: handleLogout, // 🔹 logout fonksiyonunu bağladık
     },
     {
       id: 'delete',
@@ -65,24 +95,17 @@ const ProfileScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
 
-        {/* Profile Header */}
         <ProfileHeader user={user} />
-
-        {/* Premium Card */}
         <PremiumCard onUpgrade={() => console.log('Upgrade pressed')} />
-
-        {/* Actions List */}
         <ActionsList items={actionItems} />
       </ScrollView>
     </SafeAreaView>
@@ -90,27 +113,16 @@ const ProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5', // açık gri arka plan
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 24,
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
   header: {
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 24,
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000000',
-  },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: '#000' },
 });
 
 export default ProfileScreen;
