@@ -8,6 +8,7 @@ const MainLessonCard = ({
   description = "Practice answering common introduction and interview-style questions.",
   buttonText = "Continue Learning",
   onPress,
+  disabled = false,
 }) => {
   return (
     <View style={styles.card}>
@@ -30,9 +31,13 @@ const MainLessonCard = ({
       </View>
 
       {/* Buton */}
-      <TouchableOpacity style={styles.button} onPress={onPress}>
-        <Text style={styles.buttonText}>{buttonText}</Text>
-        <Text style={styles.buttonIcon}>🚀</Text>
+      <TouchableOpacity 
+        style={[styles.button, disabled && styles.buttonDisabled]} 
+        onPress={onPress}
+        disabled={disabled}
+      >
+        <Text style={[styles.buttonText, disabled && styles.buttonTextDisabled]}>{buttonText}</Text>
+        {!disabled && <Text style={styles.buttonIcon}>🚀</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -93,11 +98,18 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  buttonDisabled: {
+    backgroundColor: '#3A3A3C',
+    opacity: 0.6,
+  },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
     marginRight: 8,
+  },
+  buttonTextDisabled: {
+    color: '#A1A1AA',
   },
   buttonIcon: {
     fontSize: 18,

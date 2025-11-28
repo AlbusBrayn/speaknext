@@ -1,8 +1,15 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, Pressable } from 'react-native';
 
-const PracticeMiniCardLeft = ({ title = "Grammar Drill", status = "Completed", icon, onPress }) => {
-  const disabled = status === "locked";
+const PracticeMiniCardLeft = ({ title = "Grammar Drill", status = "in_progress", icon, onPress }) => {
+  const disabled = status !== "in_progress";
+  
+  // Format status for display
+  const statusLabel = status === "locked" 
+    ? "Locked 🔒" 
+    : status === "completed" 
+    ? "Completed ✅" 
+    : "In Progress";
 
   return (
     <Pressable
@@ -15,10 +22,10 @@ const PracticeMiniCardLeft = ({ title = "Grammar Drill", status = "Completed", i
       ]}
       android_ripple={{ color: 'rgba(255,255,255,0.08)', borderless: false }}
     >
-      {icon && <Image source={icon} style={styles.icon} />}
+      {icon && <Image source={icon} style={[styles.icon, disabled && { opacity: 0.5 }]} />}
       <View style={styles.textContainer}>
-        <Text style={styles.status}>{status}</Text>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.status, disabled && styles.statusDisabled]}>{statusLabel}</Text>
+        <Text style={[styles.title, disabled && styles.titleDisabled]}>{title}</Text>
       </View>
     </Pressable>
   );
@@ -52,10 +59,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 4,
   },
+  statusDisabled: {
+    color: '#A1A1AA',
+  },
   title: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '500',
+  },
+  titleDisabled: {
+    color: '#A1A1AA',
   },
 });
 

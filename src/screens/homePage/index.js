@@ -144,49 +144,91 @@ const HomeDashboardScreen = ({ navigation }) => {
   );
 
   const buttonTextForDay = useCallback(
-    (dayId) => {
+    (dayId, step = "speaking") => {
+      // Check if this is the current day and step
+      const isCurrentDayAndStep = 
+        progress?.current_day === dayId && 
+        progress?.current_step === step;
+      
+      // If it's the current lesson, show "Start" instead of "Locked"
+      if (isCurrentDayAndStep) {
+        return "Start";
+      }
+      
       const status = getDayStatus(dayId);
-      if (status === "locked") return "Locked";
-      if (status === "completed") return "Completed";
+      if (status === "locked") return "Locked 🔒";
+      if (status === "completed") return "Completed ✅";
       return "Continue Learning";
       // "in_progress" veya "unlocked" → continue
     },
-    [getDayStatus]
+    [getDayStatus, progress]
   );
 
   const handlePress = useCallback(
     (dayId, step) => {
       const status = getStepStatus(dayId, step);
-      if (status === "locked") return;
+      
+      // Allow navigation if:
+      // 1. Step is in_progress, OR
+      // 2. This is the current day and step (even if status is locked)
+      const isCurrentDayAndStep = 
+        progress?.current_day === dayId && 
+        progress?.current_step === step;
+      
+      if (status !== 'in_progress' && !isCurrentDayAndStep) {
+        return;
+      }
 
-      // MainNavigator’daki isimlere göre yönlendir:
-      const target =
-        step === "speaking"
-          ? "SpeakingIntroScreen"
-          : step === "grammar"
-          ? "GrammarScreen"
-          : step === "feedback"
-          ? "VocabularyFeedbackScreen"
-          : null;
+      console.log('[Home] navigate to step', step, 'for day', dayId);
+
+      // Route to appropriate screen based on step type
+      let target;
+      if (step === 'speaking') {
+        target = 'SpeakingIntroScreen';
+      } else if (step === 'grammar') {
+        target = 'GrammarScreen';
+      } else if (step === 'feedback') {
+        // For now, feedback also goes to GrammarScreen
+        // You can change this later when you have a feedback screen
+        target = 'GrammarScreen';
+      } else {
+        // Default fallback
+        target = 'GrammarScreen';
+      }
 
       if (target) {
-        navigation.navigate(target, { dayId, step });
+        navigation.navigate(target, { 
+          dayId, 
+          dayNumber: dayId, // day_id için de kullanılacak
+          step 
+        });
       }
     },
-    [getStepStatus, navigation]
+    [getStepStatus, navigation, progress]
   );
 
   // renderItem (hook: koşullu returnlardan ÖNCE tanımlı)
   const renderDay = useCallback(
-    ({ item }) => (
+    ({ item }) => {
+      const step = "speaking";
+      const stepStatus = getStepStatus(item.id, step);
+      const isCurrentDayAndStep = 
+        progress?.current_day === item.id && 
+        progress?.current_step === step;
+      
+      // Enable button if step is in_progress OR if it's the current day/step
+      const isDisabled = stepStatus !== "in_progress" && !isCurrentDayAndStep;
+      
+      return (
       <>
         <MainLessonCard
           image={item.image}
           title={item.title}
           description={item.description}
           unit={item.unit}
-          buttonText={buttonTextForDay(item.id)}
-          onPress={() => handlePress(item.id, "speaking")}
+          buttonText={buttonTextForDay(item.id, step)}
+          onPress={() => handlePress(item.id, step)}
+          disabled={isDisabled}
         />
         <ConnectorLine height={36} />
         <PracticeMiniCardRight
@@ -204,8 +246,9 @@ const HomeDashboardScreen = ({ navigation }) => {
         />
         <ConnectorLine height={36} />
       </>
-    ),
-    [buttonTextForDay, getStepStatus, handlePress]
+      );
+    },
+    [buttonTextForDay, getStepStatus, handlePress, progress]
   );
 
   // ----- Loading/Error/Empty -----
@@ -262,13 +305,13 @@ const HomeDashboardScreen = ({ navigation }) => {
           <GreetingHeader userName={user?.name || "Student"} />
         }
       />
-      {progress?.current_day && progress?.current_step && (
+{/*       {progress?.current_day && progress?.current_step && (
         <View style={styles.pointerHint}>
           <Text style={styles.pointerText}>
             Current: Day {progress.current_day} • Step {stepPretty}
           </Text>
         </View>
-      )}
+      )} */}
     </SafeAreaView>
   );
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
+import { colors, spacing, typography, borderRadius, shadows } from '../../../utils/Theme';
 
 const ProfileHeader = ({ user }) => {
   return (
@@ -14,7 +15,7 @@ const ProfileHeader = ({ user }) => {
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
             <Text style={styles.avatarText}>
-              {user.name.charAt(0).toUpperCase()}
+              {user.name?.charAt(0)?.toUpperCase() || '?'}
             </Text>
           </View>
         )}
@@ -30,40 +31,41 @@ const ProfileHeader = ({ user }) => {
 const styles = StyleSheet.create({
   profileHeader: {
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 24,
+    paddingHorizontal: spacing.xxl,
+    marginBottom: spacing.xxl,
   },
   avatarContainer: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
+    ...shadows.medium,
+    borderRadius: borderRadius.full,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 88,
+    height: 88,
+    borderRadius: borderRadius.full,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
   avatarPlaceholder: {
-    backgroundColor: '#4A67FF', // mavi ton
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 32,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    ...typography.title2,
+    color: colors.textPrimary,
   },
   userInfo: {
     alignItems: 'center',
   },
   userName: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: '#000000',
+    ...typography.title3,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   userEmail: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#666666',
+    ...typography.callout,
+    color: colors.textSecondary,
   },
 });
 

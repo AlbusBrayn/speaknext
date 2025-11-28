@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { colors, spacing, borderRadius, shadows } from '../../../utils/Theme';
 import ListItem from '../ListItem';
 
 const ActionsList = ({ items }) => {
@@ -17,20 +18,16 @@ const ActionsList = ({ items }) => {
 
 const styles = StyleSheet.create({
   actionsContainer: {
-    marginHorizontal: 16,
-    borderRadius: 12,
+    marginHorizontal: spacing.xxl,
+    borderRadius: borderRadius.lg,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    elevation: 1, // Android gölge
-    shadowColor: '#000', // iOS gölge
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    backgroundColor: colors.cardBackground,
+    ...shadows.small,
   },
   separator: {
-    height: 0.5,
-    marginLeft: 52, // icon hizasından başlasın
-    backgroundColor: '#E0E0E0',
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 52,
+    backgroundColor: colors.separator,
   },
 });
 

@@ -4,7 +4,7 @@ import { L } from '../utils/logger';
 // Axios instance ve helper'ları
 import Service, { setAccessToken, bindOnUnauthorized } from '../api/bac';
 
-// Auth servisleri (RT SecureStore’da yönetiliyor)
+// Auth servisleri (RT SecureStore'da yönetiliyor)
 import {
   loginWithIdToken,
   refreshToken,
@@ -12,7 +12,13 @@ import {
 } from '../api/bac/authservice';
 
 // (opsiyonel) RT var mı diye hızlı kontrol için:
-import { getRefreshToken, deleteRefreshToken } from '../api/secure';
+import { getRefreshToken, deleteRefreshToken, deleteSessionMeta } from '../api/secure';
+
+// QueryClient to clear React Query cache on logout/delete
+import { queryClient } from '../../App';
+
+// AsyncStorage to clear local progress cache
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const UserContext = createContext(null);
 
@@ -76,11 +82,54 @@ export function UserProvider({ children }) {
     return data; // login sonrası LoginScreen loglasın
   };
 
+  // Helper to clear all cached data (React Query, AsyncStorage, session meta)
+  const clearAllCachedData = async () => {
+    L.auth('clearAllCachedData() - clearing all caches');
+    
+    try {
+      // Clear React Query cache (progress, status, etc.)
+      queryClient.clear();
+      L.auth('clearAllCachedData() - React Query cache cleared');
+    } catch (e) {
+      L.err('clearAllCachedData() - error clearing React Query cache:', e?.message);
+    }
+
+    try {
+      // Clear AsyncStorage progress cache (used by homePage)
+      await AsyncStorage.removeItem('progress_cache_v1');
+      L.auth('clearAllCachedData() - AsyncStorage progress cache cleared');
+    } catch (e) {
+      L.err('clearAllCachedData() - error clearing AsyncStorage:', e?.message);
+    }
+
+    try {
+      // Clear session meta if it exists
+      await deleteSessionMeta();
+      L.auth('clearAllCachedData() - session meta cleared');
+    } catch (e) {
+      L.err('clearAllCachedData() - error clearing session meta:', e?.message);
+    }
+  };
+
   const signOut = async () => {
-    L.auth('signOut()');
-    try { await logoutThisDevice(); } catch {}
+    L.auth('signOut() - starting logout process');
+    
+    try {
+      // Call backend logout endpoint
+      await logoutThisDevice();
+      L.auth('signOut() - backend logout successful');
+    } catch (e) {
+      L.err('signOut() - backend logout error (continuing with local cleanup):', e?.message);
+    }
+    
+    // Clear all cached data (React Query, AsyncStorage, session meta)
+    await clearAllCachedData();
+    
+    // Clear in-memory auth state
     injectAccessToken(null);
     setUser(null);
+    
+    L.auth('signOut() - complete, user signed out');
   };
 
   // Opsiyonel: sadece isme hızlı yama yapmak istersen (status query’si gelene kadar)

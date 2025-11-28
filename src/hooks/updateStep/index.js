@@ -1,12 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateProgress } from '../../../api/bac/statusservice';
+import { updateProgress } from '../../api/bac/statusservice';
 
 export function useCompleteStep() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ dayId, step }) =>
-      updateProgress({ day_id: dayId, step, outcome: 'completed' }),
+    mutationFn: async ({ day_number, step }) =>
+      updateProgress({ day_number, step, outcome: 'completed' }),
     onMutate: async (vars) => {
       await qc.cancelQueries(['progress']);
       const previous = qc.getQueryData(['progress']);
@@ -14,10 +14,10 @@ export function useCompleteStep() {
       qc.setQueryData(['progress'], (old) => {
         if (!old) return old;
         const copy = JSON.parse(JSON.stringify(old));
-        if (copy?.days?.[vars.dayId]?.steps) {
-          copy.days[vars.dayId].steps[vars.step] = 'completed';
-          const s = copy.days[vars.dayId].steps;
-          copy.days[vars.dayId].status =
+        if (copy?.days?.[vars.day_number]?.steps) {
+          copy.days[vars.day_number].steps[vars.step] = 'completed';
+          const s = copy.days[vars.day_number].steps;
+          copy.days[vars.day_number].status =
             s.speaking === 'completed' && s.grammar === 'completed' && s.feedback === 'completed'
               ? 'completed'
               : 'in_progress';
@@ -40,8 +40,8 @@ export function useFailStep() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ dayId, step, reason }) =>
-      updateProgress({ day_id: dayId, step, outcome: 'failed', reason }),
+    mutationFn: async ({ day_number, step, reason }) =>
+      updateProgress({ day_number, step, outcome: 'failed', reason }),
     onMutate: async () => {
       await qc.cancelQueries(['progress']);
       return { previous: qc.getQueryData(['progress']) };
@@ -59,8 +59,8 @@ export function useStartStep() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ dayId, step }) =>
-      updateProgress({ day_id: dayId, step, outcome: 'started' }),
+    mutationFn: async ({ day_number, step }) =>
+      updateProgress({ day_number, step, outcome: 'started' }),
     onMutate: async (vars) => {
       await qc.cancelQueries(['progress']);
       const previous = qc.getQueryData(['progress']);
@@ -68,10 +68,10 @@ export function useStartStep() {
       qc.setQueryData(['progress'], (old) => {
         if (!old) return old;
         const copy = JSON.parse(JSON.stringify(old));
-        if (copy?.days?.[vars.dayId]?.steps) {
-          if (copy.days[vars.dayId].steps[vars.step] === 'locked') {
-            copy.days[vars.dayId].steps[vars.step] = 'in_progress';
-            copy.days[vars.dayId].status = 'in_progress';
+        if (copy?.days?.[vars.day_number]?.steps) {
+          if (copy.days[vars.day_number].steps[vars.step] === 'locked') {
+            copy.days[vars.day_number].steps[vars.step] = 'in_progress';
+            copy.days[vars.day_number].status = 'in_progress';
           }
         }
         return copy;

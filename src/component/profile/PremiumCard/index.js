@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { colors, spacing, typography, borderRadius, shadows } from '../../../utils/Theme';
 
 const PremiumCard = ({ onUpgrade }) => {
   return (
@@ -11,7 +12,7 @@ const PremiumCard = ({ onUpgrade }) => {
         <View style={styles.premiumTextContainer}>
           <Text style={styles.premiumTitle}>Upgrade to Premium</Text>
           <Text style={styles.premiumSubtitle}>
-            Unlock advanced features and unlimited access
+            Unlock advanced speaking, grammar and feedback practice.
           </Text>
         </View>
       </View>
@@ -30,36 +31,29 @@ const PremiumCard = ({ onUpgrade }) => {
 
 const styles = StyleSheet.create({
   premiumCard: {
-    marginHorizontal: 16,
-    marginBottom: 24,
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: '#4A67FF', // ana renk
+    marginHorizontal: spacing.xxl,
+    marginBottom: spacing.xxl,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    backgroundColor: colors.primary,
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
+      ios: shadows.medium,
+      android: shadows.medium,
     }),
   },
   premiumContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   premiumIcon: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: borderRadius.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   premiumIconText: {
     fontSize: 24,
@@ -68,27 +62,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   premiumTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    ...typography.headline,
+    color: colors.buttonText,
+    marginBottom: spacing.xs,
   },
   premiumSubtitle: {
-    fontSize: 14,
+    ...typography.callout,
     color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 18,
   },
   upgradeButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    backgroundColor: colors.buttonText,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxxl,
     alignItems: 'center',
   },
   upgradeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4A67FF',
+    ...typography.bodyBold,
+    color: colors.primary,
   },
 });
 

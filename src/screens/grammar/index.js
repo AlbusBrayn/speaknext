@@ -9,7 +9,6 @@ import {
   View,
   Text,
 } from "react-native";
-import { useMutation } from "@tanstack/react-query";
 
 import Header from "../../component/GrammarScreen/Header";
 import ProgressBar from "../../component/GrammarScreen/ProgressBar";
@@ -18,28 +17,31 @@ import OptionButton from "../../component/GrammarScreen/OptionButton";
 import CheckAnswerButton from "../../component/GrammarScreen/CheckAnswerButton";
 
 import { grammarQuestions } from "../../data/grammarQuestions";
-import { useUser } from "../../contexts/UserContext";
+import { useCompleteStep } from "../../hooks/updateStep";
 
 export default function GrammarScreen({ navigation, route }) {
-  // Home’dan: navigation.navigate("GrammarScreen", { dayId, step: "grammar" })
-  const { dayId, day: dayFromAltParam } = route?.params || {};
-  const activeDay = dayId ?? dayFromAltParam ?? 1;
+  // Home'dan: navigation.navigate("GrammarScreen", { dayId, dayNumber, step: "grammar" | "speaking" | "feedback" })
+  const { dayId, dayNumber, day: dayFromAltParam, step } = route?.params || {};
+  const activeDay = dayId ?? dayNumber ?? dayFromAltParam ?? 1;
+  const currentStep = step || "grammar"; // default: grammar
   const total = 5;
 
-  const { authToken } = useUser();
+  // ---- React Query Mutation ----
+  const completeStepMutation = useCompleteStep();
 
-  // ---- Quiz state ----
+  // ---- Quiz state (sadece grammar için) ----
   const [current, setCurrent] = useState(0);        // 0..4
   const [selected, setSelected] = useState(null);   // string | null
   const [mode, setMode] = useState("idle");         // 'idle' | 'feedback' | 'completed'
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
 
-  // Günün 5 sorusu (lokal statik)
+  // Günün 5 sorusu (lokal statik) - sadece grammar için
   const questions = useMemo(() => {
+    if (currentStep !== "grammar") return [];
     const list = grammarQuestions[activeDay] || [];
     return Array.isArray(list) ? list.slice(0, total) : [];
-  }, [activeDay]);
+  }, [activeDay, currentStep]);
 
   // Yardımcılar
   const progressIndex = Math.min(current + 1, total); // 1..5
@@ -51,45 +53,124 @@ export default function GrammarScreen({ navigation, route }) {
     return selected != null && getCorrectOption(q) === selected;
   };
 
-  // ---- Backend: /progress/update (sadece completed’ta) ----
+  // ---- Backend: /progress/update için mutation handler ----
   const completionSentRef = useRef(false);
-  const [submitting, setSubmitting] = useState(false);
 
-  const completeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("https://www.campusnext.app/progress/update", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({
-          day_number: Number(activeDay),
-          step: "grammar",
-          outcome: "completed",
-        }),
-      });
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw new Error(`progress/update failed ${res.status} ${t}`);
-      }
-      return res.json().catch(() => ({}));
-    },
-    onSettled: () => {
-      completionSentRef.current = true;
-      navigation.navigate("ProfileScreen"); // Home’a dön
-    },
-  });
-
-  const sendCompleteOnce = () => {
+  const handleCompleteStep = (stepName) => {
     if (completionSentRef.current) return;
     completionSentRef.current = true;
-    setSubmitting(true);
-    completeMutation.mutate();
+
+    console.log('[GrammarScreen] Completing step', stepName, 'for day', activeDay);
+
+    completeStepMutation.mutate(
+      {
+        day_number: activeDay,
+        step: stepName,
+      },
+      {
+        onSuccess: (data) => {
+          console.log('[GrammarScreen] Step completed successfully', data);
+          navigation.goBack(); // Home'a geri dön
+        },
+        onError: (error) => {
+          console.log('[GrammarScreen] Step completion error', error);
+          completionSentRef.current = false; // Retry için
+          Alert.alert("Error", "Failed to complete step. Please try again.");
+        },
+      }
+    );
   };
 
-  // ---- Leave (geri) uyarısı: kısmi ilerleme kaydedilmez ----
+  // ---- Speaking Step: Geçici Complete Speaking UI ----
+  if (currentStep === "speaking") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <Header 
+            title={`Speaking Day ${activeDay}`} 
+            onBack={() => navigation.goBack()} 
+          />
+          
+          <View style={{ marginTop: 48, alignItems: "center", paddingHorizontal: 24 }}>
+            <Text style={styles.tempTitle}>🎤 Speaking Practice</Text>
+            <Text style={styles.tempDescription}>
+              This screen will be implemented soon. For now, you can complete the speaking step.
+            </Text>
+          </View>
+
+          <View style={{ marginTop: 48, paddingHorizontal: 24 }}>
+            <CheckAnswerButton
+              title="✅ Complete Speaking"
+              intent="primary"
+              onPress={() => handleCompleteStep("speaking")}
+              disabled={completeStepMutation.isPending}
+            />
+            {completeStepMutation.isPending && (
+              <ActivityIndicator style={{ marginTop: 12 }} />
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ---- Feedback Step: Placeholder UI ----
+  if (currentStep === "feedback") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <Header 
+            title={`Feedback Day ${activeDay}`} 
+            onBack={() => navigation.goBack()} 
+          />
+          
+          <View style={{ marginTop: 48, alignItems: "center", paddingHorizontal: 24 }}>
+            <Text style={styles.tempTitle}>📝 Feedback Review</Text>
+            <Text style={styles.tempDescription}>
+              Feedback screen coming soon
+            </Text>
+          </View>
+
+          <View style={{ marginTop: 48, paddingHorizontal: 24 }}>
+            <CheckAnswerButton
+              title="✅ Finish Day"
+              intent="primary"
+              onPress={() => {
+                console.log('[Feedback] Completing feedback step for day', activeDay);
+                
+                completeStepMutation.mutate(
+                  {
+                    day_number: activeDay,
+                    step: "feedback",
+                  },
+                  {
+                    onSuccess: (data) => {
+                      console.log('[Feedback] day completed', data);
+                      // Navigation will happen after query invalidation completes
+                      navigation.navigate('MainTabs', { screen: 'Home' });
+                    },
+                    onError: (error) => {
+                      console.log('[Feedback] completion error', error);
+                      Alert.alert("Error", "Failed to complete feedback. Please try again.");
+                    },
+                  }
+                );
+              }}
+              disabled={completeStepMutation.isPending}
+            />
+            {completeStepMutation.isPending && (
+              <ActivityIndicator style={{ marginTop: 12 }} />
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ---- Leave (geri) uyarısı: kısmi ilerleme kaydedilmez (sadece grammar için) ----
   useEffect(() => {
+    if (currentStep !== "grammar") return;
+    
     const unsub = navigation.addListener("beforeRemove", (e) => {
       // Quiz bitti & API atılıyorsa engelleme
       if (mode === "completed" || completionSentRef.current) return;
@@ -108,7 +189,7 @@ export default function GrammarScreen({ navigation, route }) {
       );
     });
     return unsub;
-  }, [navigation, mode, current, selected, progressIndex]);
+  }, [navigation, mode, current, selected, progressIndex, currentStep]);
 
   // ---- Buton aksiyonları ----
   const onCheckAnswer = () => {
@@ -129,11 +210,11 @@ export default function GrammarScreen({ navigation, route }) {
     }
   };
 
-  // ---- Guard: data yoksa ----
-  if (!questions.length) {
+  // ---- Guard: data yoksa (sadece grammar için) ----
+  if (currentStep === "grammar" && !questions.length) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header title={`Grammar Day ${activeDay}`} onBack={() => navigation.navigate("ProfileScreen")} />
+        <Header title={`Grammar Day ${activeDay}`} onBack={() => navigation.navigate("MainTabs", { screen: "Profile" })} />
         <ScrollView contentContainerStyle={styles.scroll}>
           <QuestionCard question="No questions found for this day." />
         </ScrollView>
@@ -146,7 +227,7 @@ export default function GrammarScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Header title={`Grammar Day ${activeDay}`} onBack={() => navigation.navigate("ProfileScreen")} />
+          <Header title={`Grammar Day ${activeDay}`} onBack={() => navigation.navigate("MainTabs", { screen: "Profile" })} />
 
           <View style={{ marginTop: 24, alignItems: "center" }}>
             <Text style={styles.summaryTitle}>🎯 Grammar Day {activeDay} Completed</Text>
@@ -158,10 +239,12 @@ export default function GrammarScreen({ navigation, route }) {
             <CheckAnswerButton
               title="✔️ Back to Home"
               intent="primary"
-              onPress={sendCompleteOnce}
-              disabled={submitting}
+              onPress={() => handleCompleteStep("grammar")}
+              disabled={completeStepMutation.isPending}
             />
-            {submitting && <ActivityIndicator style={{ marginTop: 12 }} />}
+            {completeStepMutation.isPending && (
+              <ActivityIndicator style={{ marginTop: 12 }} />
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -174,11 +257,12 @@ export default function GrammarScreen({ navigation, route }) {
   const inFeedback = mode === "feedback";
   const isCorrectSel = inFeedback && selected === correctOpt;
 
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Header (goBack => beforeRemove tetiklenir) */}
-        <Header title={`Grammar Day ${activeDay}`} onBack={() => navigation.navigate("ProfileScreen")} />
+        <Header title={`Grammar Day ${activeDay}`} onBack={() => navigation.goBack()} />
 
         {/* Progress (1/5 + bar) */}
         <Text style={styles.progressText}>{progressIndex}/{total}</Text>
@@ -203,7 +287,7 @@ export default function GrammarScreen({ navigation, route }) {
               selected={selected === opt}
               intent={intent}
               onPress={() => !inFeedback && setSelected(opt)}
-              disabled={submitting || inFeedback} // feedback sırasında kilit
+              disabled={completeStepMutation.isPending || inFeedback} // feedback sırasında kilit
             />
           );
         })}
@@ -214,14 +298,14 @@ export default function GrammarScreen({ navigation, route }) {
             title={selected ? "Check Answer" : "Select an Answer"}
             intent={selected ? "primary" : "neutral"}
             onPress={onCheckAnswer}
-            disabled={!selected || submitting}
+            disabled={!selected || completeStepMutation.isPending}
           />
         ) : (
           <CheckAnswerButton
             title="Next"
             intent={isCorrectSel ? "success" : "danger"}
             onPress={onNext}
-            disabled={submitting}
+            disabled={completeStepMutation.isPending}
           />
         )}
       </ScrollView>
@@ -235,4 +319,6 @@ const styles = StyleSheet.create({
   progressText: { color: "#C7C9D1", marginTop: 4, marginLeft: 16, marginBottom: 6, fontSize: 13 },
   summaryTitle: { color: "white", fontSize: 20, fontWeight: "700" },
   summaryLine: { color: "white", fontSize: 16, marginTop: 8 },
+  tempTitle: { color: "white", fontSize: 24, fontWeight: "700", marginBottom: 12, textAlign: "center" },
+  tempDescription: { color: "#C7C9D1", fontSize: 16, textAlign: "center", lineHeight: 24 },
 });

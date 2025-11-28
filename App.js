@@ -6,7 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { UserProvider } from './src/contexts/UserContext';
 
 
-const queryClient = new QueryClient();
+// Export queryClient so it can be used to clear cache on logout/delete
+export const queryClient = new QueryClient();
 
 export default function App() {
   return (

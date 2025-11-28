@@ -23,11 +23,15 @@ export async function getProgress() {
 }
 
 // Bir adımın durumunu güncelle (started/completed/failed gibi)
-export async function updateProgress({ day_id, step, outcome, reason }) {
+export async function updateProgress({ day_number, step, outcome, reason }) {
   // outcome: 'started' | 'completed' | 'failed' (senin backend'in nasıl istiyorsa)
-  const payload = { day_id, step, outcome };
+  const payload = { day_number, step, outcome };
   if (reason) payload.reason = reason;
 
+  console.log('[updateProgress] Final payload:', JSON.stringify(payload));
+  L.api('→ POST /progress/update', JSON.stringify(payload));
   const res = await Service.post('/progress/update', payload);
+  L.api('← 200 /progress/update', JSON.stringify(res?.data ?? {}));
+  
   return res?.data;
 }

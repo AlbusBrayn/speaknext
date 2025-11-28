@@ -42,7 +42,7 @@ const SubscriptionScreen = ({ navigation }) => {
     // 1) Optimistic: aboneliği aktif yap
     qc.setQueryData(['status'], (old) => {
       const next = { ...(old || {}) };
-      next.is_subscription_active = true;  // 🔑 Root Main'e geçer
+      next.is_subscription_active = true;  // 🔑 Root Main'e geçer // 
       next.plan = selectedPlan;
       return next;
     });

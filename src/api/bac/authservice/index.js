@@ -93,3 +93,25 @@ export async function revokeSession(sessionId) {
   const res = await Service.post(`/auth/sessions/${sessionId}/revoke`);
   return res?.data || { ok: true };
 }
+
+// Hesabı tamamen sil (geri alınamaz)
+export async function deleteAccount() {
+  try {
+    // Aynı base URL üzerinden çağırıyoruz ki mevcut auth interceptor'ları çalışsın
+    console.log('[deleteAccount] Sending DELETE /delete/account request');
+    const response = await Service.delete('/delete/account');
+    console.log('[deleteAccount] DELETE response status:', response?.status);
+    console.log('[deleteAccount] DELETE response data:', response?.data);
+    return response;
+  } catch (error) {
+    console.log('[deleteAccount] DELETE error:', error?.response?.status, error?.message);
+    // Re-throw so caller can handle it
+    throw error;
+  } finally {
+    // Her durumda yerel oturum bilgisini temizle
+    // Note: React Query cache and AsyncStorage will be cleared by UserContext.signOut()
+    // which is called after deleteAccount() in ProfileScreen
+    await deleteRefreshToken();
+    console.log('[deleteAccount] Refresh token deleted from SecureStore');
+  }
+}
