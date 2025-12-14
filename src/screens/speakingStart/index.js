@@ -21,7 +21,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../../utils/Theme';
-
+import Service from '../../api/bac';
 // Shared components
 import SpeakingHeader from '../../component/speakingScreen/Header';
 import SpeakingProgress from '../../component/speakingScreen/Progress';
@@ -151,40 +151,43 @@ async function uploadSpeakingAnswer(uploadUrl, localFileUri) {
 const SpeakingStartScreen = ({ navigation, route }) => {
   // Params from SpeakingIntroScreen: navigation.navigate('SpeakingStartScreen', { sessionInit, dayNumber })
   const { sessionInit, dayNumber } = route?.params || {};
+
   const apiQuestions = sessionInit?.questions || [];
   const audioUrls = sessionInit?.audio_urls || [];
+  const sessionId = sessionInit?.session_id;
 
   console.log('[SpeakingStart] route params', {
     hasSessionInit: !!sessionInit,
     dayNumber,
     questionsFromApi: apiQuestions.length,
     audioUrls: audioUrls.length,
+    sessionId,
   });
 
-  // Merge API questions with local QUESTIONS_DATA
-  // - Use question_text from API to override title
-  // - Keep all other fields from QUESTIONS_DATA
-  const mergedQuestions = QUESTIONS_DATA.map((q, index) => {
-    const apiQuestion = apiQuestions[index];
+  // ---- NEW MERGE LOGIC (REAL BACKEND DATA) ----
+  // Merge questions[] with audio_urls[] using question_order
+  const questionsToUse = apiQuestions.map((q) => {
+    const audio = audioUrls.find(
+      (a) => Number(a.question_order) === Number(q.question_order)
+    );
+
     const merged = {
-      ...q,
-      title: apiQuestion?.question_text || q.title,
+      question_id: q.question_id,
+      title: q.question_text,
+      instruction: q.instruction || "", // If backend adds later
+      video_url: q.video_url,
+      part: q.part,
+      question_order: q.question_order,
+
+      upload_url: audio?.upload_url || null,
+      file_path: audio?.file_path || null,
     };
 
-    if (apiQuestion) {
-      console.log('[SpeakingStart] merged question', {
-        index,
-        fallbackTitle: q.title,
-        apiTitle: apiQuestion?.question_text,
-        finalTitle: merged.title,
-      });
-    }
-
+    console.log("[SpeakingStart] merged question", merged);
     return merged;
   });
 
-  const questionsToUse = mergedQuestions;
-
+  // ---- STATES ----
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [phase, setPhase] = useState('video'); // video | recording | completed
   const [isRecording, setIsRecording] = useState(false);
@@ -194,33 +197,43 @@ const SpeakingStartScreen = ({ navigation, route }) => {
   const [videoThumbnail, setVideoThumbnail] = useState(null);
 
   const videoRef = useRef(null);
-  
+
   // Initialize audio recorder with expo-audio
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
 
-  // Get current question data from merged questions (API + local)
+  // Get current merged question
   const currentQuestion = questionsToUse[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === questionsToUse.length - 1;
 
-  // Create separate video players for each question
-  const player1 = useVideoPlayer(questionsToUse[0].videoSource, (player) => {
-    player.loop = false;
-  });
-  
-  const player2 = useVideoPlayer(questionsToUse[1].videoSource, (player) => {
-    player.loop = false;
-  });
-  
-  const player3 = useVideoPlayer(questionsToUse[2].videoSource, (player) => {
-    player.loop = false;
-  });
+  // ---- CREATE VIDEO PLAYERS ----
+  // Each question will load its own video_url
+  const player1 = useVideoPlayer(
+    questionsToUse[0]?.video_url,
+    (player) => (player.loop = false)
+  );
 
-  // Get the current player based on question index
-  const player = currentQuestionIndex === 0 ? player1 : currentQuestionIndex === 1 ? player2 : player3;
-  const thumbnailPlayer = player; // Use same player for thumbnail
+  const player2 = useVideoPlayer(
+    questionsToUse[1]?.video_url,
+    (player) => (player.loop = false)
+  );
 
-  // Check permissions on mount
+  const player3 = useVideoPlayer(
+    questionsToUse[2]?.video_url,
+    (player) => (player.loop = false)
+  );
+
+  // Map correct player to current question
+  const player =
+    currentQuestionIndex === 0
+      ? player1
+      : currentQuestionIndex === 1
+      ? player2
+      : player3;
+
+  const thumbnailPlayer = player; // For circular preview video
+
+
   useEffect(() => {
     const checkPermissions = async () => {
       try {
@@ -505,76 +518,145 @@ const SpeakingStartScreen = ({ navigation, route }) => {
   };
 
   const stopRecording = async () => {
-    if (!isRecording) return;
-    
-    setIsRecording(false);
-    const uri = await stopAudioRecording();
-    
-    // Save recording to device
-    let saveResult = null;
-    if (uri) {
-      saveResult = await saveRecordingToDevice(uri);
+  if (!isRecording) return;
+  
+  setIsRecording(false);
+  const uri = await stopAudioRecording();
+  
+  // Save recording to device
+  let saveResult = null;
+  if (uri) {
+    saveResult = await saveRecordingToDevice(uri);
+  }
+
+  // Upload to presigned URL for this question (if available)
+  const audioMeta = questionsToUse[currentQuestionIndex]; // UPDATED → backend merged data
+  if (audioMeta && audioMeta.upload_url && uri) {
+    console.log('[SpeakingStart] starting upload for question', {
+      index: currentQuestionIndex,
+      uploadUrl: audioMeta.upload_url,
+      uri,
+    });
+
+    let success = false;
+
+    try {
+      success = await uploadSpeakingAnswer(audioMeta.upload_url, uri);
+      console.log('[SpeakingStart] upload result', {
+        index: currentQuestionIndex,
+        success,
+      });
+    } catch (error) {
+      console.error('[SpeakingStart] upload error', error);
     }
 
-    // Upload to presigned URL for this question (if available)
-    const audioMeta = audioUrls[currentQuestionIndex];
-    if (audioMeta && audioMeta.upload_url && uri) {
-      console.log('[SpeakingStart] starting upload for question', {
-        index: currentQuestionIndex,
-        uploadUrl: audioMeta.upload_url,
-        uri,
-      });
+    // ---- NEW: BACKEND CONFIRM CALL ----
+    if (success) {
       try {
-        const success = await uploadSpeakingAnswer(audioMeta.upload_url, uri);
-        console.log('[SpeakingStart] upload result', {
-          index: currentQuestionIndex,
-          success,
+        console.log("[SpeakingStart] confirming upload to backend");
+
+        const confirmRes = await fetch(
+          "https://www.campusnext.app/speaking/confirm/upload",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              exam_session_id: sessionInit.session_id,
+              question_id: audioMeta.question_id,
+              file_path: audioMeta.file_path,
+            }),
+          }
+        );
+
+        const confirmJson = await confirmRes.json();
+        console.log("[SpeakingStart] confirm response", confirmJson);
+
+      } catch (err) {
+        console.error("[SpeakingStart] confirm upload failed", err);
+      }
+    }
+
+  } else {
+    console.log('[SpeakingStart] no upload URL for question', {
+      index: currentQuestionIndex,
+      hasAudioMeta: !!audioMeta,
+      hasUploadUrl: !!audioMeta?.upload_url,
+      hasUri: !!uri,
+    });
+  }
+  
+  // Store recording info
+  const recordingInfo = {
+    questionId: audioMeta?.question_id,
+    questionTitle: audioMeta?.title,
+    uri: uri,
+    saveResult: saveResult,
+    timestamp: new Date().toISOString()
+  };
+  setAllRecordings(prev => [...prev, recordingInfo]);
+  
+  setPhase('completed');
+
+  // Auto-advance to next question after a brief delay
+  setTimeout(() => {
+    handleQuestionComplete();
+  }, 1500);
+};
+
+const handleQuestionComplete = async () => {
+  console.log('[SpeakingStart] question completed, finishing session...', {
+    session_id: sessionInit?.session_id,
+    part: sessionInit?.part,
+  });
+
+  try {
+    // 1) Bu part / session için "completed" çağrısı
+    const completedRes = await Service.post('/speaking/completed', {
+      session_id: sessionInit.session_id,
+    });
+
+    const completedData = completedRes?.data;
+    console.log('[SpeakingStart] /speaking/completed response', completedData);
+
+    const nextPart = completedData?.next_part;
+
+    if (nextPart) {
+      // 2) Yeni part varsa → aynı gün için yeni session init et
+      console.log('[SpeakingStart] next_part detected, starting new session for same day', {
+        dayNumber,
+        nextPart,
+      });
+
+      const nextSessionRes = await Service.post('/speaking/session/init', {
+        day_number: dayNumber,
+      });
+
+      const nextSession = nextSessionRes?.data;
+      console.log('[SpeakingStart] new /speaking/session/init response', nextSession);
+
+      if (nextSession) {
+        // 3) Aynı ekranda yeni session ile devam et
+        navigation.replace('SpeakingStartScreen', {
+          sessionInit: nextSession,
+          dayNumber,
         });
-      } catch (error) {
-        console.error('[SpeakingStart] upload error', error);
+      } else {
+        console.warn('[SpeakingStart] next session init response empty, falling back to result');
+        navigation.navigate('SpeakingResult', { dayNumber });
       }
     } else {
-      console.log('[SpeakingStart] no upload URL for question', {
-        index: currentQuestionIndex,
-        hasAudioMeta: !!audioMeta,
-        hasUploadUrl: !!audioMeta?.upload_url,
-        hasUri: !!uri,
-      });
-    }
-    
-    // Store recording info
-    const recordingInfo = {
-      questionId: currentQuestion.id,
-      questionTitle: currentQuestion.title,
-      uri: uri,
-      saveResult: saveResult,
-      timestamp: new Date().toISOString()
-    };
-    setAllRecordings(prev => [...prev, recordingInfo]);
-    
-    setPhase('completed');
-
-    // Auto-advance to next question after a brief delay
-    setTimeout(() => {
-      handleQuestionComplete();
-    }, 1500);
-  };
-
-  const handleQuestionComplete = () => {
-    if (isLastQuestion) {
-      // All questions completed, go to results
-      console.log('All recordings completed:', allRecordings);
-      // Pass dayNumber to SpeakingResult so it can mark the step as completed
+      // 4) Yeni part yok → tüm speaking bitti
+      console.log('[SpeakingStart] no next_part, navigating to SpeakingResult');
       navigation.navigate('SpeakingResult', { dayNumber });
-    } else {
-      // Move to next question
-      setCurrentQuestionIndex(prev => prev + 1);
-      setPhase('video');
-      setIsRecording(false);
-      setVideoThumbnail(null);
     }
-  };
-
+  } catch (err) {
+    console.error('[SpeakingStart] error in handleQuestionComplete', err);
+    // Hata olsa bile kullanıcı takılmasın
+    navigation.navigate('SpeakingResult', { dayNumber });
+  }
+};
   // Effect to reset video player when question changes
   useEffect(() => {
     if (phase === 'video' && player) {

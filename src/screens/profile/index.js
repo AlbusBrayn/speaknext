@@ -18,7 +18,7 @@ import ProfileHeader from '../../component/profile/ProfileHeader';
 import PremiumCard from '../../component/profile/PremiumCard';
 import ActionsList from '../../component/profile/ActionsList';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const { signOut } = useUser();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -99,7 +99,7 @@ const ProfileScreen = () => {
       id: 'subscription',
       title: 'Manage Subscription',
       icon: '💳',
-      onPress: () => console.log('Manage Subscription'),
+      onPress: () => navigation.navigate('SubscriptionScreen_v2'),
     },
     {
       id: 'whatsapp',

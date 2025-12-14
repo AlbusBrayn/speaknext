@@ -10,6 +10,7 @@ import GrammarScreen from "../../screens/grammar";
 import SpeakingResultScreen from "../../screens/speakingResult";
 import SpeakingIntroScreen from "../../screens/speakingIntro";
 import SpeakingStartScreen from "../../screens/speakingStart";
+import SubscriptionScreen_v2 from "../../screens/SubscriptionScreen/subs_v2";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -72,6 +73,7 @@ const MainNavigator = () => {
       <Stack.Screen name="SpeakingResult" component={SpeakingResultScreen} />
       <Stack.Screen name="SpeakingIntroScreen" component={SpeakingIntroScreen} />
       <Stack.Screen name="SpeakingStartScreen" component={SpeakingStartScreen} />
+      <Stack.Screen name="SubscriptionScreen_v2" component={SubscriptionScreen_v2} />
     </Stack.Navigator>
   );
 };
