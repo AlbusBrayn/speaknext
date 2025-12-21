@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   SafeAreaView,
   StatusBar,
-  ScrollView,
   StyleSheet,
   Alert,
   ActivityIndicator,
   Platform,
+  Linking,
 } from 'react-native';
 import { deleteAccount } from '../../api/bac/authservice';
 import { useUser } from '../../contexts/UserContext';
 import { colors, spacing, typography } from '../../utils/Theme';
+import { getLocal } from '../../api/local';
 
 import ProfileHeader from '../../component/profile/ProfileHeader';
 import PremiumCard from '../../component/profile/PremiumCard';
@@ -22,6 +23,19 @@ const ProfileScreen = () => {
   const { signOut } = useUser();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [profile, setProfile] = useState({ name: '', email: '' });
+
+  useEffect(() => {
+    (async () => {
+      const cached = await getLocal('user_profile_v1');
+      if (cached?.name || cached?.email) {
+        setProfile({
+          name: cached?.name || '',
+          email: cached?.email || '',
+        });
+      }
+    })();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -89,8 +103,8 @@ const ProfileScreen = () => {
   };
 
   const user = {
-    name: 'John Doe',
-    email: 'john@example.com',
+    name: profile?.name || 'Student',
+    email: profile?.email || '',
     avatarUrl: null,
   };
 
@@ -102,22 +116,16 @@ const ProfileScreen = () => {
       onPress: () => console.log('Manage Subscription'),
     },
     {
-      id: 'whatsapp',
-      title: 'Contact Us via WhatsApp',
-      icon: '💬',
-      onPress: () => console.log('Contact WhatsApp'),
-    },
-    {
       id: 'terms',
       title: 'Terms of Service',
       icon: '📋',
-      onPress: () => console.log('Navigate to Terms'),
+      onPress: () => Linking.openURL('https://example.com/terms'),
     },
     {
       id: 'privacy',
       title: 'Privacy Policy',
       icon: '🔒',
-      onPress: () => console.log('Navigate to Privacy'),
+      onPress: () => Linking.openURL('https://example.com/privacy'),
     },
     {
       id: 'logout',
@@ -143,16 +151,9 @@ const ProfileScreen = () => {
         barStyle="light-content"
         backgroundColor={colors.background}
       />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
-          <Text style={styles.headerSubtitle}>
-            Manage your account, subscription and preferences.
-          </Text>
         </View>
 
         <ProfileHeader user={user} />
@@ -167,7 +168,7 @@ const ProfileScreen = () => {
             </Text>
           </View>
         )}
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -177,11 +178,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  scrollView: {
+  content: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: spacing.huge,
+    paddingBottom: spacing.lg,
   },
   header: {
     paddingHorizontal: spacing.xxl,
@@ -191,11 +190,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...typography.title1,
     color: colors.textPrimary,
-  },
-  headerSubtitle: {
-    ...typography.body,
-    marginTop: spacing.sm,
-    color: colors.textSecondary,
   },
   loadingOverlay: {
     marginTop: spacing.xl,

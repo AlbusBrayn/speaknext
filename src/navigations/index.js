@@ -43,7 +43,7 @@ export default function RootNavigator() {
   }
 
   // 3) Auth var → status yükleniyor/yenileniyor → geçiş ekranı
-  if (statusLoading || statusFetching) {
+  if ((statusLoading || statusFetching) && !status) {
     L.nav('state: status loading/fetching → BlankSplash');
     return <BlankSplash />;
   }

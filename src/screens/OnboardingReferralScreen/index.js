@@ -13,6 +13,9 @@ import { L } from '../../utils/logger';
 
 import { useUser } from '../../contexts/UserContext';
 import Service from '../../api/bac'; // axios instance
+import { saveLocal } from '../../api/local';
+
+const USER_PROFILE_CACHE_KEY = 'user_profile_v1';
 
 const referralOptions = [
   { value: 'youtube',        title: 'YouTube',        icon: '📺' },
@@ -42,7 +45,7 @@ const OnboardingReferralScreen = () => {
       const payload = {
         name: finalName,               // ✅ Name burada kullanılıyor
         age: '18_24',                  // TODO: ileride adım 2'den al
-        referral_source: selectedReferral, // canonical
+        referral_source: 'friend', // canonical
         exam_type: 'ielts',
         level: 'intermediate',         // TODO: ileride adım 2'den al
       };
@@ -52,7 +55,16 @@ const OnboardingReferralScreen = () => {
     onSuccess: async (res) => {
           L.ob('POST /profile response:', res?.data);
 
-      const serverName = res?.data?.name;
+      const serverUser = res?.data?.user || {};
+      const serverName = serverUser?.name ?? res?.data?.name;
+      const serverEmail = serverUser?.email ?? res?.data?.email;
+
+      if (serverName || serverEmail) {
+        await saveLocal(USER_PROFILE_CACHE_KEY, {
+          name: serverName ?? null,
+          email: serverEmail ?? null,
+        });
+      }
 
       // 1) Context'teki geçici adı backend'in normalize ettiği isimle güncelle
       if (serverName) setUsername(serverName);

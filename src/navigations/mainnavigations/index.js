@@ -8,6 +8,7 @@ import BlankSplash from "../../screens/BlankSplash";
 import ProfileScreen from "../../screens/profile";
 import GrammarScreen from "../../screens/grammar";
 import SpeakingResultScreen from "../../screens/speakingResult";
+import SpeakingFeedbackScreen from "../../screens/speakingFeedback";
 import SpeakingIntroScreen from "../../screens/speakingIntro";
 import SpeakingStartScreen from "../../screens/speakingStart";
 
@@ -70,6 +71,7 @@ const MainNavigator = () => {
       <Stack.Screen name="BlankSplash" component={BlankSplash} />
       <Stack.Screen name="GrammarScreen" component={GrammarScreen} />
       <Stack.Screen name="SpeakingResult" component={SpeakingResultScreen} />
+      <Stack.Screen name="SpeakingFeedback" component={SpeakingFeedbackScreen} />
       <Stack.Screen name="SpeakingIntroScreen" component={SpeakingIntroScreen} />
       <Stack.Screen name="SpeakingStartScreen" component={SpeakingStartScreen} />
     </Stack.Navigator>

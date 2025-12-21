@@ -1,5 +1,5 @@
 // src/screens/homePage/index.js
-import React, { useEffect, useCallback, useState, useMemo } from "react";
+import React, { useEffect, useCallback, useState, useMemo, useRef } from "react";
 import {
   SafeAreaView,
   FlatList,
@@ -8,6 +8,7 @@ import {
   Text,
   ActivityIndicator,
   Button,
+  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
@@ -56,20 +57,46 @@ const normalizeProgress = (raw) => {
       ? step
       : null;
 
-  const srcDays = raw?.days ?? {};
   const dstDays = {};
-  Object.keys(srcDays).forEach((k) => {
-    const dayId = Number(k);
-    const d = srcDays[k] || {};
-    dstDays[dayId] = {
-      status: d?.status ?? "locked",
-      steps: {
-        speaking: d?.steps?.speaking ?? "locked",
-        grammar: d?.steps?.grammar ?? "locked",
-        feedback: d?.steps?.feedback ?? "locked",
-      },
-    };
-  });
+  const srcDays = raw?.days ?? [];
+
+  if (Array.isArray(srcDays)) {
+    srcDays.forEach((item) => {
+      const dayId = Number(item?.day_number);
+      if (!Number.isFinite(dayId)) return;
+      const d = item?.data || {};
+      const steps = d?.steps || {};
+      const speakingStatus =
+        steps?.speaking?.status ?? steps?.speaking ?? "locked";
+      const grammarStatus =
+        steps?.grammar?.status ?? steps?.grammar ?? "locked";
+      const feedbackStatus =
+        steps?.feedback?.status ?? steps?.feedback ?? "locked";
+      dstDays[dayId] = {
+        status: d?.status ?? "locked",
+        steps: {
+          speaking: speakingStatus,
+          grammar: grammarStatus,
+          feedback: feedbackStatus,
+        },
+        speaking_started: !!steps?.speaking?.started,
+      };
+    });
+  } else {
+    Object.keys(srcDays).forEach((k) => {
+      const dayId = Number(k);
+      const d = srcDays[k] || {};
+      dstDays[dayId] = {
+        status: d?.status ?? "locked",
+        steps: {
+          speaking: d?.steps?.speaking ?? "locked",
+          grammar: d?.steps?.grammar ?? "locked",
+          feedback: d?.steps?.feedback ?? "locked",
+        },
+        speaking_started: !!d?.steps?.speaking?.started,
+      };
+    });
+  }
 
   return { current_day, current_step, days: dstDays };
 };
@@ -82,6 +109,7 @@ const HomeDashboardScreen = ({ navigation }) => {
 
   // Yerel cache (ilk boyama için)
   const [cachedProgress, setCachedProgress] = useState(null);
+  const listRef = useRef(null);
 
   // İlk açılışta cache’i oku
   useEffect(() => {
@@ -143,30 +171,28 @@ const HomeDashboardScreen = ({ navigation }) => {
     [progress]
   );
 
+  const getSpeakingStarted = useCallback(
+    (dayId) => !!progress?.days?.[dayId]?.speaking_started,
+    [progress]
+  );
+
   const buttonTextForDay = useCallback(
     (dayId, step = "speaking") => {
-      // Check if this is the current day and step
-      const isCurrentDayAndStep = 
-        progress?.current_day === dayId && 
-        progress?.current_step === step;
-      
-      // If it's the current lesson, show "Start" instead of "Locked"
-      if (isCurrentDayAndStep) {
-        return "Start";
+      const stepStatus = getStepStatus(dayId, step);
+      if (stepStatus === "completed") return "Completed ✅";
+      if (stepStatus === "locked") return "Locked 🔒";
+      if (step === "speaking") {
+        return getSpeakingStarted(dayId) ? "Continue" : "Start";
       }
-      
-      const status = getDayStatus(dayId);
-      if (status === "locked") return "Locked 🔒";
-      if (status === "completed") return "Completed ✅";
       return "Continue Learning";
-      // "in_progress" veya "unlocked" → continue
     },
-    [getDayStatus, progress]
+    [getSpeakingStarted, getStepStatus]
   );
 
   const handlePress = useCallback(
     (dayId, step) => {
       const status = getStepStatus(dayId, step);
+      const speakingStarted = getSpeakingStarted(dayId);
       
       // Allow navigation if:
       // 1. Step is in_progress, OR
@@ -188,23 +214,53 @@ const HomeDashboardScreen = ({ navigation }) => {
       } else if (step === 'grammar') {
         target = 'GrammarScreen';
       } else if (step === 'feedback') {
-        // For now, feedback also goes to GrammarScreen
-        // You can change this later when you have a feedback screen
-        target = 'GrammarScreen';
+        target = 'SpeakingFeedback';
       } else {
         // Default fallback
         target = 'GrammarScreen';
       }
 
       if (target) {
-        navigation.navigate(target, { 
-          dayId, 
+        if (step === "speaking" && speakingStarted && status !== "completed") {
+          Alert.alert(
+            "You already started this speaking exam.",
+            "",
+            [
+              {
+                text: "Continue from where you left off",
+                onPress: () =>
+                  navigation.navigate(target, {
+                    dayId,
+                    dayNumber: dayId, // day_id için de kullanılacak
+                    step,
+                    resume: true,
+                  }),
+              },
+              {
+                text: "Start from the beginning",
+                style: "destructive",
+                onPress: () =>
+                  navigation.navigate(target, {
+                    dayId,
+                    dayNumber: dayId, // day_id için de kullanılacak
+                    step,
+                    resume: false,
+                  }),
+              },
+            ],
+            { cancelable: true }
+          );
+          return;
+        }
+
+        navigation.navigate(target, {
+          dayId,
           dayNumber: dayId, // day_id için de kullanılacak
-          step 
+          step,
         });
       }
     },
-    [getStepStatus, navigation, progress]
+    [getSpeakingStarted, getStepStatus, navigation, progress]
   );
 
   // renderItem (hook: koşullu returnlardan ÖNCE tanımlı)
@@ -251,6 +307,27 @@ const HomeDashboardScreen = ({ navigation }) => {
     [buttonTextForDay, getStepStatus, handlePress, progress]
   );
 
+  // ----- Normal render -----
+  const stepPretty =
+    progress.current_step === "speaking"
+      ? "Speaking"
+      : progress.current_step === "grammar"
+      ? "Grammar"
+      : progress.current_step === "feedback"
+      ? "Feedback"
+      : "-";
+
+  // Current day'e otomatik kaydır
+  useEffect(() => {
+    const dayId = progress?.current_day;
+    if (!dayId || !Array.isArray(days)) return;
+    const index = days.findIndex((d) => d.id === dayId);
+    if (index < 0) return;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+    });
+  }, [progress?.current_day]);
+
   // ----- Loading/Error/Empty -----
   const hasDays = useMemo(() => Array.isArray(days) && days.length > 0, []);
   const showSpinner = (isLoading || isFetching) && !cachedProgress;
@@ -284,23 +361,17 @@ const HomeDashboardScreen = ({ navigation }) => {
     );
   }
 
-  // ----- Normal render -----
-  const stepPretty =
-    progress.current_step === "speaking"
-      ? "Speaking"
-      : progress.current_step === "grammar"
-      ? "Grammar"
-      : progress.current_step === "feedback"
-      ? "Feedback"
-      : "-";
-
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        ref={listRef}
         data={days}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderDay}
         contentContainerStyle={styles.scroll}
+        onScrollToIndexFailed={({ index }) => {
+          listRef.current?.scrollToIndex({ index, animated: true });
+        }}
         ListHeaderComponent={
           <GreetingHeader userName={user?.name || "Student"} />
         }
