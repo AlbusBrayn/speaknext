@@ -3,33 +3,54 @@ import { useQuery } from '@tanstack/react-query';
 import { getProgress } from '../../../api/bac/statusservice';
 import { useUser } from '../../../contexts/UserContext';
 
-// Backend: { current_day, current_step, days: { [day_number]: { status, steps } } }
+// Backend: { current_day, current_step, days: [...] | { [day_number]: { status, steps } } }
 const normalizeProgress = (raw) => {
   if (!raw || typeof raw !== 'object') return { current_day: null, current_step: null, days: {} };
 
   const cd = Number(raw?.current_day);
-  const cs = Number(raw?.current_step);
+  const step = raw?.current_step;
+  const current_step =
+    step === 'speaking' || step === 'grammar' || step === 'feedback' ? step : null;
 
-  // days: key = day_number (string/number) → number’a çevir
-  const src = raw?.days ?? {};
+  // days: array or object → number’a çevir
+  const src = raw?.days ?? [];
   const out = {};
-  Object.keys(src).forEach((k) => {
-    const day = Number(k);
-    const v = src[k] || {};
-    out[day] = {
-      status: v?.status ?? 'locked',
-      steps: {
-        speaking: v?.steps?.speaking ?? 'locked',
-        grammar:  v?.steps?.grammar  ?? 'locked',
-        feedback: v?.steps?.feedback ?? 'locked',
-      },
-    };
-  });
+  if (Array.isArray(src)) {
+    src.forEach((item) => {
+      const day = Number(item?.day_number);
+      if (!Number.isFinite(day)) return;
+      const v = item?.data || {};
+      const steps = v?.steps || {};
+      out[day] = {
+        status: v?.status ?? 'locked',
+        steps: {
+          speaking: steps?.speaking?.status ?? steps?.speaking ?? 'locked',
+          grammar: steps?.grammar?.status ?? steps?.grammar ?? 'locked',
+          feedback: steps?.feedback?.status ?? steps?.feedback ?? 'locked',
+        },
+        speaking_started: !!steps?.speaking?.started,
+      };
+    });
+  } else {
+    Object.keys(src).forEach((k) => {
+      const day = Number(k);
+      const v = src[k] || {};
+      out[day] = {
+        status: v?.status ?? 'locked',
+        steps: {
+          speaking: v?.steps?.speaking ?? 'locked',
+          grammar: v?.steps?.grammar ?? 'locked',
+          feedback: v?.steps?.feedback ?? 'locked',
+        },
+        speaking_started: !!v?.steps?.speaking?.started,
+      };
+    });
+  }
 
   return {
     // İstersen burada null yerine 1 kullan (UI beklentine göre seç)
     current_day: Number.isFinite(cd) && cd > 0 ? cd : null,
-    current_step: Number.isFinite(cs) && cs > 0 ? cs : null,
+    current_step,
     days: out,
   };
 };

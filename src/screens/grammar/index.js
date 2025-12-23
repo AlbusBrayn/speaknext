@@ -70,7 +70,17 @@ export default function GrammarScreen({ navigation, route }) {
       {
         onSuccess: (data) => {
           console.log('[GrammarScreen] Step completed successfully', data);
-          navigation.goBack(); // Home'a geri dön
+          const nextStep = data?.current_step;
+          const nextDay = Number(data?.current_day);
+          if (nextStep === "feedback" && nextDay === activeDay) {
+            navigation.navigate("SpeakingFeedback", {
+              dayId: activeDay,
+              dayNumber: activeDay,
+              step: "feedback",
+            });
+            return;
+          }
+          navigation.navigate("MainTabs", { screen: "Home" });
         },
         onError: (error) => {
           console.log('[GrammarScreen] Step completion error', error);
@@ -80,6 +90,39 @@ export default function GrammarScreen({ navigation, route }) {
       }
     );
   };
+
+  useEffect(() => {
+    if (currentStep !== "feedback") return;
+    navigation.replace("SpeakingFeedback", {
+      dayId: activeDay,
+      dayNumber: activeDay,
+      step: "feedback",
+    });
+  }, [activeDay, currentStep, navigation]);
+
+  // ---- Leave (geri) uyarısı: kısmi ilerleme kaydedilmez (sadece grammar için) ----
+  useEffect(() => {
+    if (currentStep !== "grammar") return;
+    
+    const unsub = navigation.addListener("beforeRemove", (e) => {
+      // Quiz bitti & API atılıyorsa engelleme
+      if (mode === "completed" || completionSentRef.current) return;
+
+      const hasProgress = current > 0 || !!selected;
+      if (!hasProgress) return; // hiç ilerleme yoksa sorma
+
+      e.preventDefault();
+      Alert.alert(
+        "Leave?",
+        `Your progress (${progressIndex}/${total}) will be lost.`,
+        [
+          { text: "Continue", style: "cancel" },
+          { text: "Leave", style: "destructive", onPress: () => navigation.dispatch(e.data.action) },
+        ]
+      );
+    });
+    return unsub;
+  }, [navigation, mode, current, selected, progressIndex, currentStep]);
 
   // ---- Speaking Step: Geçici Complete Speaking UI ----
   if (currentStep === "speaking") {
@@ -114,82 +157,17 @@ export default function GrammarScreen({ navigation, route }) {
     );
   }
 
-  // ---- Feedback Step: Placeholder UI ----
+  // ---- Feedback Step: Redirect to feedback screen ----
   if (currentStep === "feedback") {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <Header 
-            title={`Feedback Day ${activeDay}`} 
-            onBack={() => navigation.goBack()} 
-          />
-          
-          <View style={{ marginTop: 48, alignItems: "center", paddingHorizontal: 24 }}>
-            <Text style={styles.tempTitle}>📝 Feedback Review</Text>
-            <Text style={styles.tempDescription}>
-              Feedback screen coming soon
-            </Text>
-          </View>
-
-          <View style={{ marginTop: 48, paddingHorizontal: 24 }}>
-            <CheckAnswerButton
-              title="✅ Finish Day"
-              intent="primary"
-              onPress={() => {
-                console.log('[Feedback] Completing feedback step for day', activeDay);
-                
-                completeStepMutation.mutate(
-                  {
-                    day_number: activeDay,
-                    step: "feedback",
-                  },
-                  {
-                    onSuccess: (data) => {
-                      console.log('[Feedback] day completed', data);
-                      // Navigation will happen after query invalidation completes
-                      navigation.navigate('MainTabs', { screen: 'Home' });
-                    },
-                    onError: (error) => {
-                      console.log('[Feedback] completion error', error);
-                      Alert.alert("Error", "Failed to complete feedback. Please try again.");
-                    },
-                  }
-                );
-              }}
-              disabled={completeStepMutation.isPending}
-            />
-            {completeStepMutation.isPending && (
-              <ActivityIndicator style={{ marginTop: 12 }} />
-            )}
-          </View>
-        </ScrollView>
+        <View style={styles.redirectContainer}>
+          <ActivityIndicator />
+          <Text style={styles.redirectText}>Loading feedback...</Text>
+        </View>
       </SafeAreaView>
     );
   }
-
-  // ---- Leave (geri) uyarısı: kısmi ilerleme kaydedilmez (sadece grammar için) ----
-  useEffect(() => {
-    if (currentStep !== "grammar") return;
-    
-    const unsub = navigation.addListener("beforeRemove", (e) => {
-      // Quiz bitti & API atılıyorsa engelleme
-      if (mode === "completed" || completionSentRef.current) return;
-
-      const hasProgress = current > 0 || !!selected;
-      if (!hasProgress) return; // hiç ilerleme yoksa sorma
-
-      e.preventDefault();
-      Alert.alert(
-        "Leave?",
-        `Your progress (${progressIndex}/${total}) will be lost.`,
-        [
-          { text: "Continue", style: "cancel" },
-          { text: "Leave", style: "destructive", onPress: () => navigation.dispatch(e.data.action) },
-        ]
-      );
-    });
-    return unsub;
-  }, [navigation, mode, current, selected, progressIndex, currentStep]);
 
   // ---- Buton aksiyonları ----
   const onCheckAnswer = () => {
@@ -237,7 +215,7 @@ export default function GrammarScreen({ navigation, route }) {
 
           <View style={{ marginTop: 24 }}>
             <CheckAnswerButton
-              title="✔️ Back to Home"
+              title="Next to Feedback"
               intent="primary"
               onPress={() => handleCompleteStep("grammar")}
               disabled={completeStepMutation.isPending}
@@ -321,4 +299,6 @@ const styles = StyleSheet.create({
   summaryLine: { color: "white", fontSize: 16, marginTop: 8 },
   tempTitle: { color: "white", fontSize: 24, fontWeight: "700", marginBottom: 12, textAlign: "center" },
   tempDescription: { color: "#C7C9D1", fontSize: 16, textAlign: "center", lineHeight: 24 },
+  redirectContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  redirectText: { color: "#C7C9D1", fontSize: 16 },
 });

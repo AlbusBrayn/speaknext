@@ -20,6 +20,22 @@ const OnboardingNameScreen = ({ navigation }) => {
   const [isFocused, setIsFocused] = useState(false);
   const { setUsername } = useUser(); // ✅ setUser değil, setUsername
 
+  const handleNameChange = (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setName(text);
+      return;
+    }
+
+    const words = trimmed.split(/\s+/);
+    if (words.length <= 30) {
+      setName(text);
+      return;
+    }
+
+    setName(words.slice(0, 30).join(' '));
+  };
+
   const handleContinue = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -45,7 +61,7 @@ const OnboardingNameScreen = ({ navigation }) => {
           <HeaderSection />
           <NameInput
             value={name}
-            onChangeText={setName}
+            onChangeText={handleNameChange}
             isFocused={isFocused}
             setIsFocused={setIsFocused}
             onSubmit={handleContinue}

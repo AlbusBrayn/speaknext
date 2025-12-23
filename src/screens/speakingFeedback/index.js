@@ -62,11 +62,11 @@ const formatScore = (score) => {
   return score.toFixed(1);
 };
 
-const SpeakingResultsScreen = ({ navigation, route }) => {
+const SpeakingFeedbackScreen = ({ navigation, route }) => {
   // Get dayNumber from route params (passed from SpeakingStartScreen)
   const dayNumber = route?.params?.dayNumber || route?.params?.dayId || 1;
   
-  // Hook to mark speaking step as completed
+  // Hook to mark feedback step as completed
   const completeStepMutation = useCompleteStep();
   const completionSentRef = useRef(false);
   const [feedbackData, setFeedbackData] = useState(null);
@@ -87,7 +87,7 @@ const SpeakingResultsScreen = ({ navigation, route }) => {
       setFeedbackData(response?.data || null);
     } catch (error) {
       if (!isMountedRef.current) return;
-      console.log('[SpeakingResult] feedback fetch error', error);
+      console.log('[SpeakingFeedback] feedback fetch error', error);
       setFeedbackError('Failed to load feedback.');
     } finally {
       if (!isMountedRef.current) return;
@@ -103,27 +103,27 @@ const SpeakingResultsScreen = ({ navigation, route }) => {
     };
   }, [fetchFeedback]);
   
-  // Mark speaking as completed before navigating back
+  // Mark feedback as completed before navigating back
   const handleBackToFeedback = () => {
     // Prevent duplicate calls
     if (completionSentRef.current) return;
     completionSentRef.current = true;
 
-    console.log('[SpeakingResult] Completing speaking step for day', dayNumber);
+    console.log('[SpeakingFeedback] Completing feedback step for day', dayNumber);
 
     completeStepMutation.mutate(
       {
         day_number: dayNumber,
-        step: 'speaking',
+        step: 'feedback',
       },
       {
         onSuccess: (data) => {
-          console.log('[SpeakingResult] Speaking step completed successfully', data);
+          console.log('[SpeakingFeedback] Feedback step completed successfully', data);
           // Navigate back to main tabs after successful completion
           navigation.navigate('MainTabs');
         },
         onError: (error) => {
-          console.log('[SpeakingResult] Step completion error', error);
+          console.log('[SpeakingFeedback] Step completion error', error);
           completionSentRef.current = false; // Allow retry
           Alert.alert(
             'Error',
@@ -327,4 +327,4 @@ const styles = StyleSheet.create({
   retryButtonText: { ...typography.bodyBold, color: colors.textPrimary },
 });
 
-export default SpeakingResultsScreen;
+export default SpeakingFeedbackScreen;

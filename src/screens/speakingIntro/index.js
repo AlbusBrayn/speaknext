@@ -28,6 +28,7 @@ const SpeakingIntroScreen = ({ navigation, route }) => {
 
   // Get day_number from route params (passed from homePage)
   const dayNumber = route?.params?.dayNumber || route?.params?.dayId || 1;
+  const resume = route?.params?.resume === true;
 
   // Initialize session on mount
   useEffect(() => {
@@ -65,7 +66,8 @@ const SpeakingIntroScreen = ({ navigation, route }) => {
     // Pass sessionInit response to SpeakingStart
     navigation.navigate('SpeakingStartScreen', { 
       sessionInit,
-      dayNumber 
+      dayNumber,
+      resume,
     });
   };
 

@@ -26,36 +26,7 @@ import Service from '../../api/bac';
 import SpeakingHeader from '../../component/speakingScreen/Header';
 import SpeakingProgress from '../../component/speakingScreen/Progress';
 
-// Assets
-const QUESTION_VIDEO = require('../../../assets/vid.mp4');
-
-// Mock questions data array (local fallback)
-const QUESTIONS_DATA = [
-  {
-    id: 1,
-    videoSource: require('../../../assets/vid.mp4'),
-    title: "Describe a memorable journey you have taken",
-    instruction: "You should say where you went, who you traveled with, and explain why this journey was memorable for you.",
-    preparationTime: 60, 
-    speakingTime: 120, 
-  },
-  {
-    id: 2,
-    videoSource: require('../../../assets/videoplayback.mp4'),
-    title: "Talk about a book that influenced you",
-    instruction: "You should say what the book was about, when you read it, and explain how it influenced your thinking.",
-    preparationTime: 60, 
-    speakingTime: 120, 
-  },
-  {
-    id: 3,
-    videoSource: require('../../../assets/vid.mp4'),
-    title: "Describe a skill you would like to learn",
-    instruction: "You should say what the skill is, why you want to learn it, and explain how you would go about learning it.",
-    preparationTime: 60, 
-    speakingTime: 120, 
-  },
-];
+const TOTAL_QUESTIONS = 3;
 
 /**
  * Upload speaking answer audio file to the provided upload URL
@@ -149,8 +120,8 @@ async function uploadSpeakingAnswer(uploadUrl, localFileUri) {
 }
 
 const SpeakingStartScreen = ({ navigation, route }) => {
-  // Params from SpeakingIntroScreen: navigation.navigate('SpeakingStartScreen', { sessionInit, dayNumber })
-  const { sessionInit, dayNumber } = route?.params || {};
+  // Params from SpeakingIntroScreen: navigation.navigate('SpeakingStartScreen', { sessionInit, dayNumber, resume })
+  const { sessionInit, dayNumber, resume } = route?.params || {};
 
   const apiQuestions = sessionInit?.questions || [];
   const audioUrls = sessionInit?.audio_urls || [];
@@ -162,33 +133,44 @@ const SpeakingStartScreen = ({ navigation, route }) => {
     questionsFromApi: apiQuestions.length,
     audioUrls: audioUrls.length,
     sessionId,
+    resume,
   });
 
   // ---- NEW MERGE LOGIC (REAL BACKEND DATA) ----
-  // Merge questions[] with audio_urls[] using question_order
-  const questionsToUse = apiQuestions.map((q) => {
-    const audio = audioUrls.find(
-      (a) => Number(a.question_order) === Number(q.question_order)
-    );
+  // Merge questions[] with audio_urls[] using question_order (single question per session)
+  const questionsToUse = Array.from({ length: TOTAL_QUESTIONS }, () => null);
+  apiQuestions.forEach((q) => {
+    const questionOrder = Number(q?.question_order);
+    const globalStep = Number(sessionInit?.current_step) || 1;
+    const audio =
+      audioUrls.find((a) => Number(a.question_order) === questionOrder) ||
+      audioUrls.find((a) => Number(a.question_order) === globalStep);
+    const effectiveOrder =
+      Number(audio?.question_order) ||
+      questionOrder ||
+      globalStep ||
+      1;
+    const orderIndex = Math.max(0, effectiveOrder - 1);
 
     const merged = {
       question_id: q.question_id,
       title: q.question_text,
-      instruction: q.instruction || "", // If backend adds later
+      instruction: q.instruction || "",
       video_url: q.video_url,
       part: q.part,
       question_order: q.question_order,
-
       upload_url: audio?.upload_url || null,
       file_path: audio?.file_path || null,
     };
 
-    console.log("[SpeakingStart] merged question", merged);
-    return merged;
+    questionsToUse[orderIndex] = merged;
+    console.log("[SpeakingStart] merged question", { index: orderIndex, ...merged });
   });
 
   // ---- STATES ----
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const initialQuestionIndex =
+    Math.max(0, (sessionInit?.current_step || 1) - 1);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(initialQuestionIndex);
   const [phase, setPhase] = useState('video'); // video | recording | completed
   const [isRecording, setIsRecording] = useState(false);
   const [hasAudioPermission, setHasAudioPermission] = useState(false);
@@ -203,25 +185,23 @@ const SpeakingStartScreen = ({ navigation, route }) => {
   const recorderState = useAudioRecorderState(audioRecorder);
 
   // Get current merged question
-  const currentQuestion = questionsToUse[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === questionsToUse.length - 1;
+  const totalQuestions = TOTAL_QUESTIONS;
+  const currentQuestion = questionsToUse[currentQuestionIndex] || {};
+  const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
 
   // ---- CREATE VIDEO PLAYERS ----
   // Each question will load its own video_url
-  const player1 = useVideoPlayer(
-    questionsToUse[0]?.video_url,
-    (player) => (player.loop = false)
-  );
+  const player1 = questionsToUse[0]?.video_url
+    ? useVideoPlayer(questionsToUse[0].video_url, (player) => (player.loop = false))
+    : null;
 
-  const player2 = useVideoPlayer(
-    questionsToUse[1]?.video_url,
-    (player) => (player.loop = false)
-  );
+  const player2 = questionsToUse[1]?.video_url
+    ? useVideoPlayer(questionsToUse[1].video_url, (player) => (player.loop = false))
+    : null;
 
-  const player3 = useVideoPlayer(
-    questionsToUse[2]?.video_url,
-    (player) => (player.loop = false)
-  );
+  const player3 = questionsToUse[2]?.video_url
+    ? useVideoPlayer(questionsToUse[2].video_url, (player) => (player.loop = false))
+    : null;
 
   // Map correct player to current question
   const player =
@@ -229,9 +209,22 @@ const SpeakingStartScreen = ({ navigation, route }) => {
       ? player1
       : currentQuestionIndex === 1
       ? player2
-      : player3;
+      : player3 || null;
 
   const thumbnailPlayer = player; // For circular preview video
+
+  useEffect(() => {
+    [player1, player2, player3].forEach((p, index) => {
+      if (!p || index === currentQuestionIndex) {
+        return;
+      }
+      try {
+        p.pause();
+      } catch (error) {
+        // Ignore pause errors for inactive players
+      }
+    });
+  }, [currentQuestionIndex, player1, player2, player3]);
 
 
   useEffect(() => {
@@ -606,6 +599,14 @@ const SpeakingStartScreen = ({ navigation, route }) => {
 };
 
 const handleQuestionComplete = async () => {
+  if (sessionInit?.status !== 'in_progress') {
+    console.warn(
+      '[SpeakingStart] session not in progress, skipping completed call',
+      { sessionId: sessionInit?.session_id, status: sessionInit?.status }
+    );
+    return;
+  }
+
   console.log('[SpeakingStart] question completed, finishing session...', {
     session_id: sessionInit?.session_id,
     part: sessionInit?.part,
@@ -622,33 +623,32 @@ const handleQuestionComplete = async () => {
 
     const nextPart = completedData?.next_part;
 
-    if (nextPart) {
-      // 2) Yeni part varsa → aynı gün için yeni session init et
-      console.log('[SpeakingStart] next_part detected, starting new session for same day', {
+    if (nextPart === 'exam_finished') {
+      console.log('[SpeakingStart] exam finished, navigating to result');
+      navigation.navigate('SpeakingResult', { dayNumber });
+      return;
+    }
+
+    console.log('[SpeakingStart] next_part detected, starting new session for same day', {
+      dayNumber,
+      nextPart,
+    });
+
+    const nextSessionRes = await Service.post('/speaking/session/init', {
+      day_number: dayNumber,
+    });
+
+    const nextSession = nextSessionRes?.data;
+    console.log('[SpeakingStart] new /speaking/session/init response', nextSession);
+
+    if (nextSession) {
+      // 3) Aynı ekranda yeni session ile devam et
+      navigation.replace('SpeakingStartScreen', {
+        sessionInit: nextSession,
         dayNumber,
-        nextPart,
       });
-
-      const nextSessionRes = await Service.post('/speaking/session/init', {
-        day_number: dayNumber,
-      });
-
-      const nextSession = nextSessionRes?.data;
-      console.log('[SpeakingStart] new /speaking/session/init response', nextSession);
-
-      if (nextSession) {
-        // 3) Aynı ekranda yeni session ile devam et
-        navigation.replace('SpeakingStartScreen', {
-          sessionInit: nextSession,
-          dayNumber,
-        });
-      } else {
-        console.warn('[SpeakingStart] next session init response empty, falling back to result');
-        navigation.navigate('SpeakingResult', { dayNumber });
-      }
     } else {
-      // 4) Yeni part yok → tüm speaking bitti
-      console.log('[SpeakingStart] no next_part, navigating to SpeakingResult');
+      console.warn('[SpeakingStart] next session init response empty, falling back to result');
       navigation.navigate('SpeakingResult', { dayNumber });
     }
   } catch (err) {
@@ -670,7 +670,7 @@ const handleQuestionComplete = async () => {
   }, [currentQuestionIndex, phase, player]);
 
   // Calculate overall progress across all questions
-  const totalSteps = questionsToUse.length * 2; // 2 phases per question (video, record)
+  const totalSteps = totalQuestions * 2; // 2 phases per question (video, record)
   const currentStep = (currentQuestionIndex * 2) + (
     phase === 'video' ? 1 : 
     phase === 'recording' ? 2 : 
@@ -678,7 +678,7 @@ const handleQuestionComplete = async () => {
   );
   const overallProgress = Math.round((currentStep / totalSteps) * 100);
   
-  const stepNumber = `Question ${currentQuestionIndex + 1} of ${questionsToUse.length}`;
+  const stepNumber = `Question ${currentQuestionIndex + 1} of ${totalQuestions}`;
   const phaseLabel = 
     phase === 'video' ? 'Watch Question' :
     phase === 'recording' ? 'Record Your Answer' :
@@ -690,6 +690,7 @@ const handleQuestionComplete = async () => {
       {phase === 'video' && (
         <View style={styles.fullScreenVideoContainer}>
           <VideoView
+            key={`video-${currentQuestionIndex}`}
             style={styles.fullScreenVideo}
             player={player}
             contentFit="cover"
@@ -705,7 +706,7 @@ const handleQuestionComplete = async () => {
               >
                 <Ionicons name="arrow-back" size={24} color="white" />
               </TouchableOpacity>
-              <Text style={styles.videoHeaderText}>Question {currentQuestionIndex + 1} of {questionsToUse.length}</Text>
+              <Text style={styles.videoHeaderText}>Question {currentQuestionIndex + 1} of {totalQuestions}</Text>
             </View>
             
             {/* Skip button for testing/fallback */}
@@ -742,6 +743,7 @@ const handleQuestionComplete = async () => {
           <View style={styles.thumbnailContainer}>
             <View style={styles.circularThumbnail}>
               <VideoView
+                key={`thumbnail-${currentQuestionIndex}`}
                 style={styles.thumbnailVideo}
                 player={thumbnailPlayer}
                 contentFit="cover"
