@@ -71,6 +71,13 @@ const SpeakingIntroScreen = ({ navigation, route }) => {
     });
   };
 
+  const handleOpenInstructions = () => {
+    navigation.navigate('SpeakingInstructionsScreen', {
+      dayNumber,
+      resume,
+    });
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -96,7 +103,7 @@ const SpeakingIntroScreen = ({ navigation, route }) => {
           onPress={handleNavigateNext}
         />
         <SpeakingInfoRow onPass={handleNavigateNext} />
-        <InstructionsPanel onPress={handleNavigateNext} />
+        <InstructionsPanel onPress={handleOpenInstructions} />
       </ScrollView>
     </SafeAreaView>
   );

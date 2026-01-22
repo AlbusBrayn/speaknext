@@ -10,7 +10,7 @@ const SpeakingInfoRow = ({ onPass }) => (
       <Text style={styles.questionTypeValue}>Individual Long Turn</Text>
     </View>
     <OutlinedButton
-      title="Pass"
+      title="Start Exam"
       icon="play-forward"
       iconPosition="right"
       onPress={onPass}

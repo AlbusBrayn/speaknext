@@ -19,7 +19,7 @@ import MainLessonCard from "../../component/HomeDashboardScreen/MainLessonCard";
 import ConnectorLine from "../../component/HomeDashboardScreen/ConnectorLine";
 import PracticeMiniCardRight from "../../component/HomeDashboardScreen/PracticeMiniCardRight";
 import PracticeMiniCardLeft from "../../component/HomeDashboardScreen/PracticeMiniCardLeft";
-import GreetingHeader from "../../component/HomeDashboardScreen/GreetingHeader";
+import HomeStickyHeader from "../../component/HomeDashboardScreen/HomeStickyHeader";
 
 // Static Data (50 gün)
 import { days } from "../../data/home";
@@ -109,7 +109,25 @@ const HomeDashboardScreen = ({ navigation }) => {
 
   // Yerel cache (ilk boyama için)
   const [cachedProgress, setCachedProgress] = useState(null);
+  const [storedName, setStoredName] = useState(null);
+  const [visibleDayId, setVisibleDayId] = useState(null);
   const listRef = useRef(null);
+  const viewabilityConfigRef = useRef({
+    viewAreaCoveragePercentThreshold: 55,
+  });
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (!Array.isArray(viewableItems) || viewableItems.length === 0) return;
+    let topItem = null;
+    viewableItems.forEach((item) => {
+      if (!item.isViewable) return;
+      if (!topItem || (item.index ?? 0) < (topItem.index ?? 0)) {
+        topItem = item;
+      }
+    });
+    if (topItem?.item?.id) {
+      setVisibleDayId(topItem.item.id);
+    }
+  });
 
   // İlk açılışta cache’i oku
   useEffect(() => {
@@ -122,6 +140,22 @@ const HomeDashboardScreen = ({ navigation }) => {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const cachedName = await AsyncStorage.getItem("user_name");
+        if (cachedName) setStoredName(cachedName);
+      } catch {
+        // sessiz geç
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!user?.name) return;
+    AsyncStorage.setItem("user_name", user.name).catch(() => {});
+  }, [user?.name]);
 
   // Network sorgusu
   const {
@@ -317,6 +351,17 @@ const HomeDashboardScreen = ({ navigation }) => {
       ? "Feedback"
       : "-";
 
+  const currentDayId =
+    visibleDayId ?? progress?.current_day ?? (days?.[0]?.id ?? null);
+  const currentDay = useMemo(() => {
+    if (!Array.isArray(days) || !days.length || !currentDayId) return null;
+    return days.find((day) => day.id === currentDayId) || days[0] || null;
+  }, [currentDayId, days]);
+
+  const headerDayLabel = currentDay ? `Day ${currentDay.id}` : "Day -";
+  const headerTopic = currentDay?.topic || currentDay?.title || "-";
+  const headerName = user?.name || storedName || "Student";
+
   // Current day'e otomatik kaydır
   useEffect(() => {
     const dayId = progress?.current_day;
@@ -363,18 +408,24 @@ const HomeDashboardScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <HomeStickyHeader
+        userName={headerName}
+        dayLabel={headerDayLabel}
+        topic={headerTopic}
+        levelLabel="Beginner"
+        onPressLevel={() => navigation.navigate("LevelSelectScreen")}
+      />
       <FlatList
         ref={listRef}
         data={days}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderDay}
         contentContainerStyle={styles.scroll}
+        onViewableItemsChanged={onViewableItemsChanged.current}
+        viewabilityConfig={viewabilityConfigRef.current}
         onScrollToIndexFailed={({ index }) => {
           listRef.current?.scrollToIndex({ index, animated: true });
         }}
-        ListHeaderComponent={
-          <GreetingHeader userName={user?.name || "Student"} />
-        }
       />
 {/*       {progress?.current_day && progress?.current_step && (
         <View style={styles.pointerHint}>

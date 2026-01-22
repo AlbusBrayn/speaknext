@@ -27,6 +27,8 @@ import SpeakingHeader from '../../component/speakingScreen/Header';
 import SpeakingProgress from '../../component/speakingScreen/Progress';
 
 const TOTAL_QUESTIONS = 3;
+const MAX_RECORD_SECONDS = 30;
+const LOCK_SECONDS = 3;
 
 /**
  * Upload speaking answer audio file to the provided upload URL
@@ -177,8 +179,11 @@ const SpeakingStartScreen = ({ navigation, route }) => {
   const [hasMediaLibraryPermission, setHasMediaLibraryPermission] = useState(false);
   const [allRecordings, setAllRecordings] = useState([]);
   const [videoThumbnail, setVideoThumbnail] = useState(null);
+  const [recordingSecondsLeft, setRecordingSecondsLeft] = useState(MAX_RECORD_SECONDS);
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
 
   const videoRef = useRef(null);
+  const stopRequestedRef = useRef(false);
 
   // Initialize audio recorder with expo-audio
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -375,6 +380,13 @@ const SpeakingStartScreen = ({ navigation, route }) => {
     }
   };
 
+  const formatSeconds = (totalSeconds) => {
+    const clamped = Math.max(0, totalSeconds);
+    const minutes = Math.floor(clamped / 60);
+    const seconds = clamped % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} left`;
+  };
+
   // Audio recording with expo-audio
   const startAudioRecording = async () => {
     try {
@@ -391,6 +403,7 @@ const SpeakingStartScreen = ({ navigation, route }) => {
       await audioRecorder.prepareToRecordAsync();
       audioRecorder.record();
       
+      stopRequestedRef.current = false;
       setIsRecording(true);
       return true;
     } catch (err) {
@@ -507,6 +520,8 @@ const SpeakingStartScreen = ({ navigation, route }) => {
       return;
     }
 
+    setRecordingSecondsLeft(MAX_RECORD_SECONDS);
+    setLockSecondsLeft(LOCK_SECONDS);
     setIsRecording(true);
   };
 
@@ -598,6 +613,50 @@ const SpeakingStartScreen = ({ navigation, route }) => {
   }, 1500);
 };
 
+  useEffect(() => {
+    if (!isRecording) {
+      setLockSecondsLeft(0);
+      return;
+    }
+
+    setLockSecondsLeft(LOCK_SECONDS);
+    const intervalId = setInterval(() => {
+      setLockSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(intervalId);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [isRecording]);
+
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingSecondsLeft(MAX_RECORD_SECONDS);
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setRecordingSecondsLeft((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          if (!stopRequestedRef.current) {
+            stopRequestedRef.current = true;
+            stopRecording();
+          }
+          clearInterval(intervalId);
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [isRecording]);
+
 const handleQuestionComplete = async () => {
   if (sessionInit?.status !== 'in_progress') {
     console.warn(
@@ -684,6 +743,14 @@ const handleQuestionComplete = async () => {
     phase === 'recording' ? 'Record Your Answer' :
     'Question Complete';
 
+  const isStopLocked = isRecording && lockSecondsLeft > 0;
+  const countdownText =
+    lockSecondsLeft === 2
+      ? '2 seconds to go...'
+      : lockSecondsLeft === 1
+      ? '1 second to go...'
+      : null;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Full Screen Video Phase */}
@@ -726,12 +793,23 @@ const handleQuestionComplete = async () => {
       {/* Recording Phase - Circular Thumbnail + Microphone */}
       {phase === 'recording' && (
         <View style={styles.recordingContainer}>
-          {/* Header */}
-          <SpeakingHeader 
-            title={`Speaking Day ${dayNumber || 1}`} 
-            subtitle={phaseLabel}
-            onBack={() => navigation.goBack()}
-          />
+          <View style={styles.recordingHeaderRow}>
+            <TouchableOpacity
+              style={[
+                styles.exitButton,
+                isStopLocked && styles.disabledButton,
+              ]}
+              onPress={() => navigation.goBack()}
+              disabled={isStopLocked}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <View style={styles.recordingHeaderText}>
+              <Text style={styles.recordingTitle}>{`Speaking Day ${dayNumber || 1}`}</Text>
+              <Text style={styles.recordingSubtitle}>{phaseLabel}</Text>
+            </View>
+          </View>
 
           {/* Progress */}
           <SpeakingProgress 
@@ -763,9 +841,11 @@ const handleQuestionComplete = async () => {
             <TouchableOpacity 
               style={[
                 styles.microphoneButton,
-                isRecording && styles.microphoneButtonRecording
+                isRecording && styles.microphoneButtonRecording,
+                isStopLocked && styles.disabledButton,
               ]}
               onPress={handleMicrophonePress}
+              disabled={isStopLocked}
               activeOpacity={0.8}
             >
               <Ionicons 
@@ -774,6 +854,12 @@ const handleQuestionComplete = async () => {
                 color="white" 
               />
             </TouchableOpacity>
+            {isRecording && (
+              <Text style={styles.timerText}>{formatSeconds(recordingSecondsLeft)}</Text>
+            )}
+            {countdownText && (
+              <Text style={styles.countdownText}>{countdownText}</Text>
+            )}
             <Text style={styles.microphoneButtonText}>
               {isRecording ? "Tap to Stop Recording" : "Tap to Start Recording"}
             </Text>
@@ -827,9 +913,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -853,6 +939,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    minHeight: 44,
+    minWidth: 44,
     borderRadius: borderRadius.md,
     gap: spacing.sm,
   },
@@ -866,6 +954,33 @@ const styles = StyleSheet.create({
   recordingContainer: {
     flex: 1,
     paddingHorizontal: spacing.xl,
+  },
+  recordingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  exitButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.cardBackground,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  recordingHeaderText: {
+    flex: 1,
+  },
+  recordingTitle: {
+    ...typography.title2,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  recordingSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
   thumbnailContainer: {
     alignItems: 'center',
@@ -930,6 +1045,19 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  timerText: {
+    ...typography.headline,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  countdownText: {
+    ...typography.callout,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   
   // Completed Phase Styles

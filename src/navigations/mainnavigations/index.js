@@ -11,6 +11,8 @@ import SpeakingResultScreen from "../../screens/speakingResult";
 import SpeakingFeedbackScreen from "../../screens/speakingFeedback";
 import SpeakingIntroScreen from "../../screens/speakingIntro";
 import SpeakingStartScreen from "../../screens/speakingStart";
+import SpeakingInstructionsScreen from "../../screens/speakingInstructions";
+import LevelSelectScreen from "../../screens/levelSelect";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -73,7 +75,9 @@ const MainNavigator = () => {
       <Stack.Screen name="SpeakingResult" component={SpeakingResultScreen} />
       <Stack.Screen name="SpeakingFeedback" component={SpeakingFeedbackScreen} />
       <Stack.Screen name="SpeakingIntroScreen" component={SpeakingIntroScreen} />
+      <Stack.Screen name="SpeakingInstructionsScreen" component={SpeakingInstructionsScreen} />
       <Stack.Screen name="SpeakingStartScreen" component={SpeakingStartScreen} />
+      <Stack.Screen name="LevelSelectScreen" component={LevelSelectScreen} />
     </Stack.Navigator>
   );
 };
