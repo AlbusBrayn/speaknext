@@ -1,93 +1,87 @@
-import React, { useState } from 'react';
-import { View, SafeAreaView, ScrollView, StyleSheet } from 'react-native';
-import Header from '../../component/subscription/Header';
-import PlanCard from '../../component/subscription/PlanCard';
-import BottomSection from '../../component/subscription/BottomSection';
-import { useUser } from '../../contexts/UserContext'; // ✅ ekle
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, SafeAreaView, StyleSheet, ActivityIndicator } from 'react-native';
+import RevenueCatUI from 'react-native-purchases-ui';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUser } from '../../contexts/UserContext';
 import { L } from '../../utils/logger';
-
+import {
+  configureRevenueCat,
+  identifyRevenueCatUser,
+  REVENUECAT_ENTITLEMENT_ID,
+} from '../../lib/revenuecat';
 
 const SubscriptionScreen = ({ navigation }) => {
-  const [selectedPlan, setSelectedPlan] = useState(null);
   const qc = useQueryClient();
+  const { user } = useUser();
+  const [ready, setReady] = useState(false);
 
+  useEffect(() => {
+    configureRevenueCat();
+    identifyRevenueCatUser(user?.id);
+    setReady(true);
+  }, [user?.id]);
 
-  const plans = [
-    {
-      id: 'weekly',
-      title: 'Weekly Plan',
-      price: '$2.99',
-      features: [
-        'Unlock all speaking modules',
-        'AI-powered feedback analysis',
-        'Practice with daily speaking missions'
-      ]
+  const syncStatusFromCustomerInfo = useCallback(
+    (customerInfo) => {
+      const entitlement = customerInfo?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_ID];
+      const isActive = !!entitlement;
+      const plan = entitlement?.productIdentifier || null;
+
+      qc.setQueryData(['status'], (old) => {
+        const next = { ...(old || {}) };
+        next.is_subscription_active = isActive;
+        if (plan) next.plan = plan;
+        return next;
+      });
+
+      if (isActive) {
+        navigation.goBack();
+      }
     },
-    {
-      id: 'monthly',
-      title: 'Monthly Plan',
-      price: '$9.99',
-      features: [
-        'Everything in Weekly Plan',
-        'Track your progress & get performance stats',
-        'Personalized learning tips'
-      ]
+    [navigation, qc]
+  );
+
+  const handlePurchaseCompleted = ({ customerInfo }) => {
+    syncStatusFromCustomerInfo(customerInfo);
+  };
+
+  const handleRestoreCompleted = ({ customerInfo }) => {
+    syncStatusFromCustomerInfo(customerInfo);
+  };
+
+  const handlePurchaseError = (error) => {
+    L.err('RevenueCat purchase error', error?.message || error);
+  };
+
+  const handleRestoreError = (error) => {
+    L.err('RevenueCat restore error', error?.message || error);
+  };
+
+  const handleDismiss = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
     }
-  ];
-  const handleContinue = async () => {
-    if (!selectedPlan) return;
-    console.log('Selected plan:', selectedPlan);
-  
-    // 1) Optimistic: aboneliği aktif yap
-    qc.setQueryData(['status'], (old) => {
-      const next = { ...(old || {}) };
-      next.is_subscription_active = true;  // 🔑 Root Main'e geçer // 
-      next.plan = selectedPlan;
-      return next;
-    });
   };
-  
 
-    
-  
-
-
-  const handleRestorePurchase = () => {
-    console.log('Restore purchase triggered');
-  };
+  if (!ready) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator color="#fff" style={styles.loader} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <Header 
-          title="Choose Your Plan" 
-          onBack={() => navigation.goBack()} 
+      <View style={styles.paywallWrapper}>
+        <RevenueCatUI.Paywall
+          onPurchaseCompleted={handlePurchaseCompleted}
+          onRestoreCompleted={handleRestoreCompleted}
+          onPurchaseError={handlePurchaseError}
+          onRestoreError={handleRestoreError}
+          onDismiss={handleDismiss}
         />
-
-        {/* Plan Cards */}
-        <View style={styles.plansContainer}>
-          {plans.map(plan => (
-            <PlanCard 
-              key={plan.id}
-              plan={plan}
-              selected={selectedPlan}
-              onSelect={setSelectedPlan}
-            />
-          ))}
-        </View>
-
-        {/* Bottom Section */}
-        <BottomSection 
-          onContinue={handleContinue} 
-          onRestore={handleRestorePurchase} 
-        />
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -97,15 +91,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0F0F0F',
   },
-  scrollView: {
+  loader: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-  },
-  plansContainer: {
-    marginBottom: 32,
+  paywallWrapper: {
+    flex: 1,
   },
 });
 

@@ -18,12 +18,14 @@ import { getLocal } from '../../api/local';
 import ProfileHeader from '../../component/profile/ProfileHeader';
 import PremiumCard from '../../component/profile/PremiumCard';
 import ActionsList from '../../component/profile/ActionsList';
+import useStatus from '../../hooks/status';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const { signOut } = useUser();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profile, setProfile] = useState({ name: '', email: '' });
+  const { data: statusData } = useStatus();
 
   useEffect(() => {
     (async () => {
@@ -102,6 +104,20 @@ const ProfileScreen = () => {
     );
   };
 
+  const planLabel = (() => {
+    const plan = (statusData?.plan || '').toLowerCase();
+    if (plan.includes('week')) return 'Weekly';
+    if (plan.includes('1w')) return 'Weekly';
+    if (plan.includes('month')) return 'Monthly';
+    if (plan.includes('1m')) return 'Monthly';
+    if (!statusData?.is_subscription_active) return null;
+    return 'Active';
+  })();
+
+  const goToSubscription = () => {
+    navigation.navigate('SubscriptionScreen');
+  };
+
   const user = {
     name: profile?.name || 'Student',
     email: profile?.email || '',
@@ -111,9 +127,9 @@ const ProfileScreen = () => {
   const actionItems = [
     {
       id: 'subscription',
-      title: 'Manage Subscription',
+      title: statusData?.is_subscription_active ? 'Manage Subscription' : 'Upgrade Now',
       icon: '💳',
-      onPress: () => console.log('Manage Subscription'),
+      onPress: goToSubscription,
     },
     {
       id: 'terms',
@@ -157,7 +173,12 @@ const ProfileScreen = () => {
         </View>
 
         <ProfileHeader user={user} />
-        <PremiumCard onUpgrade={() => console.log('Upgrade pressed')} />
+        <PremiumCard
+          isActive={!!statusData?.is_subscription_active}
+          planLabel={planLabel}
+          onUpgrade={goToSubscription}
+          onManage={goToSubscription}
+        />
         <ActionsList items={actionItems} />
 
         {(isLoggingOut || isDeleting) && (

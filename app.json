@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.campusnext.speakify",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "We need access to your microphone to record speaking practice."
+        "NSMicrophoneUsageDescription": "We need access to your microphone to record speaking practice.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -26,7 +27,11 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.campusnext.speakify"
+      "package": "com.campusnext.speakify",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

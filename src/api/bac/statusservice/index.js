@@ -8,7 +8,7 @@ import { L } from '../../../utils/logger';
 
 // Kullanıcı durumları (profil, abonelik vb.)
 export async function getStatus() {
-  const res = await Service.get('/subscription/status');
+  const res = await Service.get('/subscription/revenuecat/status');
   return res?.data;
 }
 

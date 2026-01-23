@@ -41,9 +41,9 @@ const LoginScreen = () => {
   // 🔑 Google Auth Request
   const [request, response, promptAsync] = Google.useAuthRequest({
     iosClientId:
-      '187561567349-aujg06hhknipj3abe1elucv7qmf0laur.apps.googleusercontent.com',
+      '493457191588-p0jndkogseg8co2boiubh7vn7f1jmcb2.apps.googleusercontent.com',
     webClientId:
-      '187561567349-t9qskelmsq4bv3r95c48gjtgqdplkcri.apps.googleusercontent.com',
+      '493457191588-j6bb6s59bopc7eelci9ibj40bteu8b3f.apps.googleusercontent.com',
     scopes: ['openid', 'email', 'profile'],
   });
 

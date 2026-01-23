@@ -1,0 +1,17 @@
+Simülatörde gerçek satın alma akışı için StoreKit config dosyasıyla sahte App Store ortamı kurmalısın. Özet adımlar:
+
+Xcode’da StoreKit Config dosyası oluştur:
+Xcode projeni aç, File > New > File… > StoreKit Configuration.
+Dosya adı ver (ör. StoreKit.storekit), projene ekle.
+İçine ürünlerini ekle: rc_299_1w ve rc_999_1m (product identifier’lar RevenueCat/App Store Connect ile birebir). Subscription olarak tanımlayıp fiyat ve süreleri seç.
+Simülatörde bu dosyayı kullanacak şekilde ayarla:
+Xcode, Scheme > Edit Scheme… > Run > Options sekmesine git.
+“StoreKit Configuration” alanında oluşturduğun StoreKit.storekit dosyasını seç.
+“Enable In-App Purchases” işaretli olsun.
+Sandbox kullanıcı:
+Simülatörde normal Apple ID oturumu yok; StoreKit config ile test ederken sandbox kullanıcı açıp “Settings > App Store” altında sandbox hesabını ekle (simülatörde Settings > App Store > Sandbox Account). Yoksa kimlik doğrulama hatası alırsın.
+Uygulamayı Xcode’dan simülatörde çalıştır:
+Paywall açıldığında StoreKit config’teki ürünler görünür; satın alma akışı simüle edilir. RevenueCat bu test alımlarını sandbox olarak görür.
+RevenueCat tarafı:
+Offering/paketler product ID’lerle eşleşmiş olmalı (rc_299_1w, rc_999_1m). Bu olmazsa paywall boş kalır.
+Ek not: Simülatörde gerçek App Store bağlantısı yok, tüm testler StoreKit config üzerinden ilerler; gerçek cihaz + sandbox tester ile de sınamak gerekir.

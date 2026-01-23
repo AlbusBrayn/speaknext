@@ -2,9 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { getStatus } from '../../api/bac/statusservice';
 import { useUser } from '../../contexts/UserContext';
 import { L } from '../../utils/logger';
-
-// TODO: REMOVE DEV_FORCE_SUBSCRIPTION_ACTIVE when RevenueCat integration is ready
-const DEV_FORCE_SUBSCRIPTION_ACTIVE = true;
+import {
+  configureRevenueCat,
+  fetchRevenueCatEntitlement,
+  identifyRevenueCatUser,
+} from '../../lib/revenuecat';
 
 const normalizeStatus = (raw) => {
   const normalized = {
@@ -17,28 +19,32 @@ const normalizeStatus = (raw) => {
     plan: raw?.subscription?.plan ?? raw?.plan ?? null,
     expiry: raw?.subscription?.expiry ?? raw?.expiry ?? null,
   };
-
-  // TODO: REMOVE DEV_FORCE_SUBSCRIPTION_ACTIVE when RevenueCat integration is ready
-  if (DEV_FORCE_SUBSCRIPTION_ACTIVE) {
-    normalized.is_subscription_active = true;
-    if (!normalized.plan) {
-      normalized.plan = 'dev_mock';
-    }
-  }
-
   return normalized;
 };
 
 export default function useStatus() {
-  const { accessToken } = useUser();
+  const { accessToken, user } = useUser();
 
   return useQuery({
     queryKey: ['status'],
         queryFn: async () => {
+         configureRevenueCat();
          const raw = await getStatus();
           L.st('GET /subscription/status raw:', raw);
          const norm = normalizeStatus(raw);
-         L.st('normalized:', norm);
+         L.st('normalized (backend):', norm);
+
+         // RevenueCat entegrasyonu: kullanıcıyı tanımla ve entitlement durumu ile override et
+         const rcUserId = user?.id || norm.user_id;
+         await identifyRevenueCatUser(rcUserId);
+         const rc = await fetchRevenueCatEntitlement();
+         if (rc.isActive !== null) {
+           norm.is_subscription_active = rc.isActive;
+           if (rc.plan) {
+             norm.plan = rc.plan;
+           }
+           L.st('normalized (with RevenueCat):', norm);
+          }
           return norm;
        },   
         enabled: !!accessToken,

@@ -2,7 +2,14 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { colors, spacing, typography, borderRadius, shadows } from '../../../utils/Theme';
 
-const PremiumCard = ({ onUpgrade }) => {
+const PremiumCard = ({ isActive, planLabel, onUpgrade, onManage }) => {
+  const title = isActive ? `Plan: ${planLabel || 'Active'}` : 'Upgrade to Premium';
+  const subtitle = isActive
+    ? 'Manage or change your subscription.'
+    : 'Unlock advanced speaking, grammar and feedback practice.';
+  const buttonText = isActive ? 'Manage Subscription' : 'Upgrade Now';
+  const onPress = isActive ? onManage || onUpgrade : onUpgrade;
+
   return (
     <View style={styles.premiumCard}>
       <View style={styles.premiumContent}>
@@ -10,20 +17,18 @@ const PremiumCard = ({ onUpgrade }) => {
           <Text style={styles.premiumIconText}>⭐</Text>
         </View>
         <View style={styles.premiumTextContainer}>
-          <Text style={styles.premiumTitle}>Upgrade to Premium</Text>
-          <Text style={styles.premiumSubtitle}>
-            Unlock advanced speaking, grammar and feedback practice.
-          </Text>
+          <Text style={styles.premiumTitle}>{title}</Text>
+          <Text style={styles.premiumSubtitle}>{subtitle}</Text>
         </View>
       </View>
       <TouchableOpacity
         style={styles.upgradeButton}
-        onPress={onUpgrade}
+        onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel="Upgrade to Premium"
+        accessibilityLabel={buttonText}
         accessible={true}
       >
-        <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+        <Text style={styles.upgradeButtonText}>{buttonText}</Text>
       </TouchableOpacity>
     </View>
   );
