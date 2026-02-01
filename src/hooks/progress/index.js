@@ -1,7 +1,7 @@
 // src/hooks/useProgress/index.js
 import { useQuery } from '@tanstack/react-query';
 import { getProgress } from '../../../api/bac/statusservice';
-import { useUser } from '../../../contexts/UserContext';
+import { auth } from '../../../lib/firebase';
 
 // Backend: { current_day, current_step, days: [...] | { [day_number]: { status, steps } } }
 const normalizeProgress = (raw) => {
@@ -28,7 +28,6 @@ const normalizeProgress = (raw) => {
           grammar: steps?.grammar?.status ?? steps?.grammar ?? 'locked',
           feedback: steps?.feedback?.status ?? steps?.feedback ?? 'locked',
         },
-        speaking_started: !!steps?.speaking?.started,
       };
     });
   } else {
@@ -42,7 +41,6 @@ const normalizeProgress = (raw) => {
           grammar: v?.steps?.grammar ?? 'locked',
           feedback: v?.steps?.feedback ?? 'locked',
         },
-        speaking_started: !!v?.steps?.speaking?.started,
       };
     });
   }
@@ -56,12 +54,12 @@ const normalizeProgress = (raw) => {
 };
 
 export default function useProgress() {
-  const { accessToken } = useUser();
+  const hasAuth = !!auth.currentUser;
 
   return useQuery({
     queryKey: ['progress'],
     queryFn: async () => normalizeProgress(await getProgress()),
-    enabled: !!accessToken,
+    enabled: hasAuth,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,

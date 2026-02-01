@@ -10,7 +10,10 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import { deleteAccount } from '../../api/bac/authservice';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import { deleteUserAccount } from '../../api/bac/statusservice';
 import { useUser } from '../../contexts/UserContext';
 import { colors, spacing, typography } from '../../utils/Theme';
 import { getLocal } from '../../api/local';
@@ -21,11 +24,42 @@ import ActionsList from '../../component/profile/ActionsList';
 import useStatus from '../../hooks/status';
 
 const ProfileScreen = ({ navigation }) => {
-  const { signOut } = useUser();
+  const { signOut, reauthenticateWithIdToken } = useUser();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profile, setProfile] = useState({ name: '', email: '' });
   const { data: statusData } = useStatus();
+
+  WebBrowser.maybeCompleteAuthSession();
+
+  const [request, _response, promptAsync] = Google.useAuthRequest({
+    iosClientId:
+      '493457191588-p0jndkogseg8co2boiubh7vn7f1jmcb2.apps.googleusercontent.com',
+    webClientId:
+      '493457191588-j6bb6s59bopc7eelci9ibj40bteu8b3f.apps.googleusercontent.com',
+    scopes: ['openid', 'email', 'profile'],
+  });
+
+  const reauthWithApple = async () => {
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+    const idToken = credential?.identityToken;
+    if (!idToken) throw new Error('apple_id_token_missing');
+    await reauthenticateWithIdToken({ provider: 'apple', idToken });
+  };
+
+  const reauthWithGoogle = async () => {
+    if (!request) throw new Error('google_request_not_ready');
+    const res = await promptAsync();
+    if (res?.type !== 'success') throw new Error('google_reauth_cancelled');
+    const idToken = res?.authentication?.idToken;
+    if (!idToken) throw new Error('google_id_token_missing');
+    await reauthenticateWithIdToken({ provider: 'google', idToken });
+  };
 
   useEffect(() => {
     (async () => {
@@ -79,7 +113,43 @@ const ProfileScreen = ({ navigation }) => {
           onPress: async () => {
             try {
               setIsDeleting(true);
-              await deleteAccount();
+              try {
+                await deleteUserAccount();
+              } catch (err) {
+                if (err?.code === 'auth/requires-recent-login') {
+                  Alert.alert(
+                    'Re-authentication Required',
+                    'Please sign in again to delete your account.',
+                    [
+                      {
+                        text: 'Apple',
+                        onPress: async () => {
+                          try {
+                            await reauthWithApple();
+                            await deleteUserAccount();
+                          } catch (e) {
+                            Alert.alert('Error', 'Re-authentication failed.');
+                          }
+                        },
+                      },
+                      {
+                        text: 'Google',
+                        onPress: async () => {
+                          try {
+                            await reauthWithGoogle();
+                            await deleteUserAccount();
+                          } catch (e) {
+                            Alert.alert('Error', 'Re-authentication failed.');
+                          }
+                        },
+                      },
+                      { text: 'Cancel', style: 'cancel' },
+                    ]
+                  );
+                  return;
+                }
+                throw err;
+              }
               // Clear auth state - root navigator will automatically switch to AuthNavigator
               await signOut();
               Alert.alert(

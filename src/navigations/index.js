@@ -9,7 +9,6 @@ import { L } from '../utils/logger';
 import AuthNavigator from './authnavigations';
 import MainNavigator from './mainnavigations';
 import OnboardingNavigator from './onboardingnavigations';
-import SubscriptionNavigator from './subscriptionnavigations';
 
 import BlankSplash from '../screens/BlankSplash';
 
@@ -67,15 +66,15 @@ export default function RootNavigator() {
     );
   }
 
-  // 5) Abonelik aktif değilse → Subscription
-  if (status && !status.is_subscription_active) {
-    L.nav('state: subscription inactive → SubscriptionNavigator');
-    return (
-      <NavigationContainer>
-        <SubscriptionNavigator />
-      </NavigationContainer>
-    );
-  }
+  // 5) (Geçici) Abonelik guard'ını kapatıyoruz
+  // if (status && !status.is_subscription_active) {
+  //   L.nav('state: subscription inactive → SubscriptionNavigator');
+  //   return (
+  //     <NavigationContainer>
+  //       <SubscriptionNavigator />
+  //     </NavigationContainer>
+  //   );
+  // }
 
   // 6) Her şey tamamsa → Main
   L.nav('state: all good → MainNavigator');

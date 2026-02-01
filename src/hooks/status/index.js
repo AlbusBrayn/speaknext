@@ -2,11 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { getStatus } from '../../api/bac/statusservice';
 import { useUser } from '../../contexts/UserContext';
 import { L } from '../../utils/logger';
-import {
-  configureRevenueCat,
-  fetchRevenueCatEntitlement,
-  identifyRevenueCatUser,
-} from '../../lib/revenuecat';
 
 const normalizeStatus = (raw) => {
   const normalized = {
@@ -28,23 +23,23 @@ export default function useStatus() {
   return useQuery({
     queryKey: ['status'],
         queryFn: async () => {
-         configureRevenueCat();
          const raw = await getStatus();
           L.st('GET /subscription/status raw:', raw);
          const norm = normalizeStatus(raw);
          L.st('normalized (backend):', norm);
 
-         // RevenueCat entegrasyonu: kullanıcıyı tanımla ve entitlement durumu ile override et
-         const rcUserId = user?.id || norm.user_id;
-         await identifyRevenueCatUser(rcUserId);
-         const rc = await fetchRevenueCatEntitlement();
-         if (rc.isActive !== null) {
-           norm.is_subscription_active = rc.isActive;
-           if (rc.plan) {
-             norm.plan = rc.plan;
-           }
-           L.st('normalized (with RevenueCat):', norm);
-          }
+         // RevenueCat entegrasyonu şimdilik kapalı
+         // const rcUserId = user?.id || norm.user_id;
+         // configureRevenueCat(rcUserId);
+         // await identifyRevenueCatUser(rcUserId);
+         // const rc = await fetchRevenueCatEntitlement();
+         // if (rc.isActive !== null) {
+         //   norm.is_subscription_active = rc.isActive;
+         //   if (rc.plan) {
+         //     norm.plan = rc.plan;
+         //   }
+         //   L.st('normalized (with RevenueCat):', norm);
+         // }
           return norm;
        },   
         enabled: !!accessToken,

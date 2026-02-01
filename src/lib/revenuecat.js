@@ -3,14 +3,17 @@ import { L } from '../utils/logger';
 
 const REVENUECAT_API_KEY = 'appl_QsutwebiWQlxORrsZkojHImbSin';
 export const REVENUECAT_ENTITLEMENT_ID = 'CampusNext Pro';
+export const REVENUECAT_ENABLED = false;
 
 let isConfigured = false;
 let lastUserId = null;
 
-export const configureRevenueCat = () => {
+export const configureRevenueCat = (userId) => {
+  if (!REVENUECAT_ENABLED) return;
   if (isConfigured) return;
   try {
-    Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+    const appUserID = userId ? String(userId) : undefined;
+    Purchases.configure({ apiKey: REVENUECAT_API_KEY, appUserID });
     isConfigured = true;
     L.st('RevenueCat configured');
   } catch (e) {
@@ -19,6 +22,7 @@ export const configureRevenueCat = () => {
 };
 
 export const identifyRevenueCatUser = async (userId) => {
+  if (!REVENUECAT_ENABLED) return;
   if (!isConfigured) return;
   if (!userId) return;
   const id = String(userId);
@@ -33,6 +37,7 @@ export const identifyRevenueCatUser = async (userId) => {
 };
 
 export const fetchRevenueCatEntitlement = async () => {
+  if (!REVENUECAT_ENABLED) return { isActive: null, plan: null, customerInfo: null };
   if (!isConfigured) return { isActive: null, plan: null, customerInfo: null };
   try {
     const info = await Purchases.getCustomerInfo();
@@ -43,5 +48,16 @@ export const fetchRevenueCatEntitlement = async () => {
   } catch (e) {
     L.err('RevenueCat getCustomerInfo failed', e?.message);
     return { isActive: null, plan: null, customerInfo: null };
+  }
+};
+
+export const restoreRevenueCatPurchases = async () => {
+  if (!REVENUECAT_ENABLED) return null;
+  if (!isConfigured) return null;
+  try {
+    return await Purchases.restorePurchases();
+  } catch (e) {
+    L.err('RevenueCat restorePurchases failed', e?.message);
+    return null;
   }
 };

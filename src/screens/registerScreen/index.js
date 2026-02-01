@@ -11,6 +11,7 @@ import {
   View,
   KeyboardAvoidingView,
   Platform,
+  Text,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -37,6 +38,7 @@ const LoginScreen = () => {
   const navigation = useNavigation();
   const qc = useQueryClient();
   const { signInWithIdToken } = useUser();
+  const [authError, setAuthError] = useState('');
 
   // 🔑 Google Auth Request
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -55,6 +57,7 @@ const LoginScreen = () => {
       await signInWithIdToken({ provider: 'google', idToken });
     },
     onSuccess: async () => {
+      setAuthError('');
       // Giriş tamam → status/progress tazele
       await qc.invalidateQueries({ queryKey: ['status'] });
       await qc.invalidateQueries({ queryKey: ['progress'] });
@@ -62,6 +65,11 @@ const LoginScreen = () => {
       // Onboarding name ekranına geç (profil tamam değilse oradan devam)
     },
     onError: (error) => {
+      const msg =
+        error?.code === 'auth/invalid-credential'
+          ? 'Google girişi başarısız. Lütfen tekrar deneyin.'
+          : 'Google girişi başarısız oldu.';
+      setAuthError(msg);
       console.log('Google login failed:', error?.response?.data || error?.message);
     },
   });
@@ -72,6 +80,7 @@ const LoginScreen = () => {
           const data = await signInWithIdToken({ provider: 'apple', idToken });
           return data;    },
           onSuccess: async (data) => {
+          setAuthError('');
           L.auth('[Apple] /apple/login response:', data);   
            await qc.invalidateQueries({ queryKey: ['status'] });
       await qc.invalidateQueries({ queryKey: ['progress'] });
@@ -79,6 +88,11 @@ const LoginScreen = () => {
     L.st('[Apple] latest status:', latestStatus);
     },
     onError: (error) => {
+      const msg =
+        error?.code === 'auth/invalid-credential'
+          ? 'Apple girişi başarısız. Lütfen tekrar deneyin.'
+          : 'Apple girişi başarısız oldu.';
+      setAuthError(msg);
       console.log('Apple login failed:', error?.response?.data || error?.message);
     },
   });
@@ -156,6 +170,7 @@ const LoginScreen = () => {
           <View style={styles.middleSection}>
             <GoogleButton onPress={handleGoogleSignIn} isLoading={isLoading || !request} />
             <AppleButton onPress={handleAppleSignIn} isLoading={isLoading} />
+            {!!authError && <Text style={styles.errorText}>{authError}</Text>}
           </View>
 
           {/* Bottom Section */}
@@ -177,4 +192,5 @@ const styles = StyleSheet.create({
   topSection: { flex: 2, alignItems: 'center', justifyContent: 'center' },
   middleSection: { flex: 1, justifyContent: 'center' },
   bottomSection: { flex: 0.5, justifyContent: 'flex-end', alignItems: 'center' },
+  errorText: { marginTop: 12, color: '#FF6B6B', textAlign: 'center' },
 });

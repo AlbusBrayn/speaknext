@@ -12,7 +12,7 @@ import { L } from '../../utils/logger';
 
 
 import { useUser } from '../../contexts/UserContext';
-import Service from '../../api/bac'; // axios instance
+import { updateUserProfile } from '../../api/bac/statusservice';
 import { saveLocal } from '../../api/local';
 
 const USER_PROFILE_CACHE_KEY = 'user_profile_v1';
@@ -45,19 +45,19 @@ const OnboardingReferralScreen = () => {
       const payload = {
         name: finalName,               // ✅ Name burada kullanılıyor
         age: '18_24',                  // TODO: ileride adım 2'den al
-        referral_source: 'friend', // canonical
+        referral_source: selectedReferral, // canonical
         exam_type: 'ielts',
         level: 'intermediate',         // TODO: ileride adım 2'den al
       };
           L.ob('POST /profile payload:', payload);
-          return Service.post('/profile', payload);
+          return updateUserProfile(payload);
         },
     onSuccess: async (res) => {
-          L.ob('POST /profile response:', res?.data);
+          L.ob('POST /profile response:', res);
 
-      const serverUser = res?.data?.user || {};
-      const serverName = serverUser?.name ?? res?.data?.name;
-      const serverEmail = serverUser?.email ?? res?.data?.email;
+      const serverUser = res?.user || {};
+      const serverName = serverUser?.name ?? res?.name;
+      const serverEmail = serverUser?.email ?? res?.email;
 
       if (serverName || serverEmail) {
         await saveLocal(USER_PROFILE_CACHE_KEY, {

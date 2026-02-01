@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { useUser } from "../contexts/UserContext";
 import useStatus from '../hooks/status';
@@ -17,11 +17,9 @@ import SubscriptionNavigator from "./subscriptionnavigations";
 import BlankSplash from "../screens/BlankSplash";
 
 // API helper
-import Service from "../api/bac"; // axios instance
-
 export default function RootNavigator() {
   const {
-    authToken,
+    accessToken,
     isHydrated,
   } = useUser();
 
@@ -36,7 +34,7 @@ export default function RootNavigator() {
   L.nav('state: not hydrated → BlankSplash');
 
   // 2) Auth yoksa → Auth akışı
-  if (!authToken) {
+  if (!accessToken) {
     L.nav('state: no accessToken → AuthNavigator');
     return (
       <NavigationContainer>
@@ -63,16 +61,15 @@ export default function RootNavigator() {
     );
   }
 
-  // 5) (Opsiyonel guard) Abonelik aktif değilse → Subscription
-  // İstersen bu bloğu yoruma alıp direkt Main'e geçebilirsin.
-  if (!status?.is_subscription_active) {
-    L.nav('state: subscription inactive → SubscriptionNavigator');
-    return (
-      <NavigationContainer>
-        <SubscriptionNavigator />
-      </NavigationContainer>
-    );
-  }
+  // 5) (Geçici) Abonelik guard'ını kapatıyoruz (emülatörde satın alma yok)
+  // if (!status?.is_subscription_active) {
+  //   L.nav('state: subscription inactive → SubscriptionNavigator');
+  //   return (
+  //     <NavigationContainer>
+  //       <SubscriptionNavigator />
+  //     </NavigationContainer>
+  //   );
+  // }
 
   // 6) Her şey tamamsa → Main
   L.nav('state: all good → MainNavigator');

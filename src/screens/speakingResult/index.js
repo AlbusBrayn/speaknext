@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,6 @@ import { colors, typography, spacing, borderRadius } from '../../utils/Theme';
 import SpeakingHeader from '../../component/speakingScreen/Header';
 import ResultCategoryCard from '../../component/speakingScreen/Result';
 import { useCompleteStep } from '../../hooks/updateStep';
-import Service from '../../api/bac';
 
 const CATEGORY_META = [
   { id: 'grammar', title: 'Grammar', icon: 'library' },
@@ -69,39 +68,20 @@ const SpeakingResultsScreen = ({ navigation, route }) => {
   // Hook to mark speaking step as completed
   const completeStepMutation = useCompleteStep();
   const completionSentRef = useRef(false);
-  const [feedbackData, setFeedbackData] = useState(null);
-  const [feedbackLoading, setFeedbackLoading] = useState(true);
-  const [feedbackError, setFeedbackError] = useState(null);
-  const isMountedRef = useRef(true);
+  const [feedbackData] = useState({
+    overall_score: 6.0,
+    scores: {
+      grammar: 6.0,
+      fluency: 6.0,
+      pronunciation: 6.0,
+      vocabulary: 6.0,
+    },
+  });
 
   const handleBackPress = () => navigation.goBack();
 
-  const fetchFeedback = useCallback(async () => {
-    setFeedbackLoading(true);
-    setFeedbackError(null);
-    try {
-      const response = await Service.post('/speaking/feedback', {
-        day_number: dayNumber,
-      });
-      if (!isMountedRef.current) return;
-      setFeedbackData(response?.data || null);
-    } catch (error) {
-      if (!isMountedRef.current) return;
-      console.log('[SpeakingResult] feedback fetch error', error);
-      setFeedbackError('Failed to load feedback.');
-    } finally {
-      if (!isMountedRef.current) return;
-      setFeedbackLoading(false);
-    }
-  }, [dayNumber]);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    fetchFeedback();
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, [fetchFeedback]);
+  const feedbackLoading = false;
+  const feedbackError = null;
   
   // Mark speaking as completed before navigating back
   const handleBackToFeedback = () => {
@@ -181,7 +161,7 @@ const SpeakingResultsScreen = ({ navigation, route }) => {
         ) : feedbackError ? (
           <View style={styles.stateContainer}>
             <Text style={styles.stateMessage}>{feedbackError}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchFeedback}>
+            <TouchableOpacity style={styles.retryButton} onPress={() => {}}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>

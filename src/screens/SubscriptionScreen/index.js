@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, SafeAreaView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, SafeAreaView, StyleSheet, ActivityIndicator, Text, Button } from 'react-native';
 import RevenueCatUI from 'react-native-purchases-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../../contexts/UserContext';
@@ -7,6 +7,7 @@ import { L } from '../../utils/logger';
 import {
   configureRevenueCat,
   identifyRevenueCatUser,
+  REVENUECAT_ENABLED,
   REVENUECAT_ENTITLEMENT_ID,
 } from '../../lib/revenuecat';
 
@@ -16,7 +17,7 @@ const SubscriptionScreen = ({ navigation }) => {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    configureRevenueCat();
+    configureRevenueCat(user?.id);
     identifyRevenueCatUser(user?.id);
     setReady(true);
   }, [user?.id]);
@@ -71,6 +72,21 @@ const SubscriptionScreen = ({ navigation }) => {
     );
   }
 
+  if (!REVENUECAT_ENABLED) {
+    const canGoBack = navigation.canGoBack();
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.disabledWrapper}>
+          <Text style={styles.disabledTitle}>Subscriptions disabled</Text>
+          <Text style={styles.disabledText}>
+            RevenueCat is turned off for test mode.
+          </Text>
+          {canGoBack && <Button title="Back" onPress={() => navigation.goBack()} />}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.paywallWrapper}>
@@ -96,6 +112,22 @@ const styles = StyleSheet.create({
   },
   paywallWrapper: {
     flex: 1,
+  },
+  disabledWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  disabledTitle: {
+    color: '#fff',
+    fontSize: 18,
+    marginBottom: 8,
+  },
+  disabledText: {
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 16,
+    textAlign: 'center',
   },
 });
 
