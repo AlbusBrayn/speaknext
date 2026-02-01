@@ -1,53 +1,56 @@
 import { useQuery } from '@tanstack/react-query';
-import { getStatus } from '../../api/bac/statusservice';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useUser } from '../../contexts/UserContext';
 import { L } from '../../utils/logger';
-import {
-  configureRevenueCat,
-  fetchRevenueCatEntitlement,
-  identifyRevenueCatUser,
-} from '../../lib/revenuecat';
+import { db } from '../../lib/firebase';
 
-const normalizeStatus = (raw) => {
+const normalizeStatus = (raw, authUser) => {
   const normalized = {
-    user_id: raw?.user?.id ?? raw?.user_id ?? null,
-    user_name: raw?.user?.name ?? raw?.user_name ?? '',
+    user_id: raw?.user_id ?? authUser?.uid ?? null,
+    user_name: raw?.user_name ?? raw?.name ?? authUser?.name ?? authUser?.displayName ?? '',
     is_profile_completed: !!(raw?.is_profile_completed ?? raw?.profile_completed),
-    is_subscription_active: !!(raw?.is_subscription_active ?? raw?.subscription?.active ?? raw?.is_active),
+    is_subscription_active:
+      raw?.is_subscription_active ?? raw?.subscription_active ?? true,
     is_trial: !!raw?.is_trial,
     days_left: Number.isFinite(raw?.days_left) ? raw.days_left : null,
-    plan: raw?.subscription?.plan ?? raw?.plan ?? null,
-    expiry: raw?.subscription?.expiry ?? raw?.expiry ?? null,
+    plan: raw?.plan ?? null,
+    expiry: raw?.expiry ?? null,
   };
   return normalized;
 };
 
+const buildInitialDoc = (authUser) => ({
+  user_id: authUser?.uid ?? null,
+  user_name: authUser?.name ?? authUser?.displayName ?? '',
+  is_profile_completed: false,
+  is_subscription_active: true,
+  created_at: serverTimestamp(),
+  updated_at: serverTimestamp(),
+});
+
 export default function useStatus() {
-  const { accessToken, user } = useUser();
+  const { user } = useUser();
 
   return useQuery({
-    queryKey: ['status'],
-        queryFn: async () => {
-         configureRevenueCat();
-         const raw = await getStatus();
-          L.st('GET /subscription/status raw:', raw);
-         const norm = normalizeStatus(raw);
-         L.st('normalized (backend):', norm);
+    queryKey: ['status', user?.uid],
+    queryFn: async () => {
+      if (!user?.uid) return normalizeStatus({}, user);
 
-         // RevenueCat entegrasyonu: kullanıcıyı tanımla ve entitlement durumu ile override et
-         const rcUserId = user?.id || norm.user_id;
-         await identifyRevenueCatUser(rcUserId);
-         const rc = await fetchRevenueCatEntitlement();
-         if (rc.isActive !== null) {
-           norm.is_subscription_active = rc.isActive;
-           if (rc.plan) {
-             norm.plan = rc.plan;
-           }
-           L.st('normalized (with RevenueCat):', norm);
-          }
-          return norm;
-       },   
-        enabled: !!accessToken,
+      const ref = doc(db, 'users', user.uid);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists()) {
+        const initial = buildInitialDoc(user);
+        await setDoc(ref, initial);
+        L.st('created user doc:', initial);
+        return normalizeStatus(initial, user);
+      }
+
+      const data = snap.data() || {};
+      L.st('GET /users/{uid} raw:', data);
+      return normalizeStatus(data, user);
+    },
+    enabled: !!user?.uid,
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,

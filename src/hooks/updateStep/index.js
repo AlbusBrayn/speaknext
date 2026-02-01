@@ -1,17 +1,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateProgress } from '../../api/bac/statusservice';
+import { updateProgress } from '../../api/firebase/progress';
+import { useUser } from '../../contexts/UserContext';
 
 export function useCompleteStep() {
   const qc = useQueryClient();
+  const { user } = useUser();
+  const key = ['progress', user?.uid];
 
   return useMutation({
     mutationFn: async ({ day_number, step }) =>
-      updateProgress({ day_number, step, outcome: 'completed' }),
+      updateProgress(user?.uid, { day_number, step, outcome: 'completed' }),
     onMutate: async (vars) => {
-      await qc.cancelQueries(['progress']);
-      const previous = qc.getQueryData(['progress']);
+      await qc.cancelQueries(key);
+      const previous = qc.getQueryData(key);
 
-      qc.setQueryData(['progress'], (old) => {
+      qc.setQueryData(key, (old) => {
         if (!old) return old;
         const copy = JSON.parse(JSON.stringify(old));
         if (copy?.days?.[vars.day_number]?.steps) {
@@ -28,44 +31,48 @@ export function useCompleteStep() {
       return { previous };
     },
     onError: (_e, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(['progress'], ctx.previous);
+      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
     },
     onSettled: () => {
-      qc.invalidateQueries(['progress']);
+      qc.invalidateQueries(key);
     },
   });
 }
 
 export function useFailStep() {
   const qc = useQueryClient();
+  const { user } = useUser();
+  const key = ['progress', user?.uid];
 
   return useMutation({
     mutationFn: async ({ day_number, step, reason }) =>
-      updateProgress({ day_number, step, outcome: 'failed', reason }),
+      updateProgress(user?.uid, { day_number, step, outcome: 'failed', reason }),
     onMutate: async () => {
-      await qc.cancelQueries(['progress']);
-      return { previous: qc.getQueryData(['progress']) };
+      await qc.cancelQueries(key);
+      return { previous: qc.getQueryData(key) };
     },
     onError: (_e, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(['progress'], ctx.previous);
+      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
     },
     onSettled: () => {
-      qc.invalidateQueries(['progress']);
+      qc.invalidateQueries(key);
     },
   });
 }
 
 export function useStartStep() {
   const qc = useQueryClient();
+  const { user } = useUser();
+  const key = ['progress', user?.uid];
 
   return useMutation({
     mutationFn: async ({ day_number, step }) =>
-      updateProgress({ day_number, step, outcome: 'started' }),
+      updateProgress(user?.uid, { day_number, step, outcome: 'started' }),
     onMutate: async (vars) => {
-      await qc.cancelQueries(['progress']);
-      const previous = qc.getQueryData(['progress']);
+      await qc.cancelQueries(key);
+      const previous = qc.getQueryData(key);
 
-      qc.setQueryData(['progress'], (old) => {
+      qc.setQueryData(key, (old) => {
         if (!old) return old;
         const copy = JSON.parse(JSON.stringify(old));
         if (copy?.days?.[vars.day_number]?.steps) {
@@ -80,10 +87,10 @@ export function useStartStep() {
       return { previous };
     },
     onError: (_e, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(['progress'], ctx.previous);
+      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
     },
     onSettled: () => {
-      qc.invalidateQueries(['progress']);
+      qc.invalidateQueries(key);
     },
   });
 }

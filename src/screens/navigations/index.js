@@ -17,13 +17,9 @@ import SubscriptionNavigator from "./subscriptionnavigations";
 import BlankSplash from "../screens/BlankSplash";
 
 // API helper
-import Service from "../api/bac"; // axios instance
 
 export default function RootNavigator() {
-  const {
-    authToken,
-    isHydrated,
-  } = useUser();
+  const { user, isHydrated } = useUser();
 
   const { data: status, isLoading: statusLoading, isFetching } = useStatus();
   
@@ -36,8 +32,8 @@ export default function RootNavigator() {
   L.nav('state: not hydrated → BlankSplash');
 
   // 2) Auth yoksa → Auth akışı
-  if (!authToken) {
-    L.nav('state: no accessToken → AuthNavigator');
+  if (!user) {
+    L.nav('state: no user → AuthNavigator');
     return (
       <NavigationContainer>
         <AuthNavigator />

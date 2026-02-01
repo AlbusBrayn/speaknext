@@ -1,24 +1,20 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { L } from '../utils/logger';
-
-// Axios instance ve helper'ları
-import Service, { setAccessToken, bindOnUnauthorized } from '../api/bac';
-
-// Auth servisleri (RT SecureStore'da yönetiliyor)
-import {
-  loginWithIdToken,
-  refreshToken,
-  logoutThisDevice,
-} from '../api/bac/authservice';
-
-// (opsiyonel) RT var mı diye hızlı kontrol için:
-import { getRefreshToken, deleteRefreshToken, deleteSessionMeta } from '../api/secure';
-
-// QueryClient to clear React Query cache on logout/delete
-import { queryClient } from '../../App';
-
-// AsyncStorage to clear local progress cache
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  GoogleAuthProvider,
+  OAuthProvider,
+  onIdTokenChanged,
+  signInWithCredential,
+  signOut as firebaseSignOut,
+  updateProfile,
+  deleteUser,
+} from 'firebase/auth';
+import { deleteDoc, doc } from 'firebase/firestore';
+
+import { auth, db } from '../lib/firebase';
+import { setAccessToken } from '../api/bac';
+import { queryClient } from '../../App';
 
 const UserContext = createContext(null);
 
@@ -27,67 +23,26 @@ export function UserProvider({ children }) {
   const [accessToken, setAT] = useState(null);
   const [user, setUser] = useState(null);
 
-  // --- Internal helpers ---
   const injectAccessToken = (token) => {
     setAT(token || null);
-    setAccessToken(token || null); // axios header için module-level setter
+    setAccessToken(token || null);
   };
 
-  const hydrate = async () => {
-    L.auth('hydrate() start');
-    try {
-      const rt = await getRefreshToken(); // yoksa direkt signed-out
-      L.rt('RT in SecureStore?', !!rt);
-      if (!rt) {
-        injectAccessToken(null);
-        setUser(null);
-        setIsHydrated(true);
-        L.auth('hydrate() no RT → signed-out');
-        return;
-      }
-
-      const data = await refreshToken(); // { access_token, refresh_token?, user? }
-      L.rt('/auth/refresh response:', !!data?.access_token, !!data?.refresh_token, data?.user ? 'user✓' : 'user∅');
-      if (!data?.access_token) throw new Error('refresh_missing_at');
-
-      injectAccessToken(data.access_token);
-      if (data.user) setUser(data.user);
-      L.auth('hydrate() OK → AT set, user set?', !!data.user);
-    } catch (e) {
-      const st = e?.response?.status;
-    L.err('hydrate() FAILED', st, e?.message);
-      // RT yok/bozuksa temizle ve signed-out duruma düş
-      try { await deleteRefreshToken(); } catch {}
-      injectAccessToken(null);
-      setUser(null);
-    } finally {
-      setIsHydrated(true);
-      L.auth('hydrate() end → isHydrated=true');
-    }
+  const mapUser = (firebaseUser) => {
+    if (!firebaseUser) return null;
+    return {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email || '',
+      name: firebaseUser.displayName || '',
+      photoURL: firebaseUser.photoURL || null,
+    };
   };
 
-  const signInWithIdToken = async ({ provider, idToken, deviceId }) => {
-    L.auth('signInWithIdToken()', provider);
-    // provider: 'google' | 'apple' vb., idToken: federated ID token
-    const data = await loginWithIdToken({
-      provider,
-      id_token: idToken,
-      device_id: deviceId,
-    });
-    L.auth('/{provider}/login response:', provider, !!data?.access_token, !!data?.refresh_token, data?.user ? 'user✓' : 'user∅');
-    if (!data?.access_token) throw new Error('login_missing_at');
-
-    injectAccessToken(data.access_token);
-    setUser(data.user || null);
-    return data; // login sonrası LoginScreen loglasın
-  };
-
-  // Helper to clear all cached data (React Query, AsyncStorage, session meta)
+  // Helper to clear all cached data (React Query + AsyncStorage)
   const clearAllCachedData = async () => {
     L.auth('clearAllCachedData() - clearing all caches');
-    
+
     try {
-      // Clear React Query cache (progress, status, etc.)
       queryClient.clear();
       L.auth('clearAllCachedData() - React Query cache cleared');
     } catch (e) {
@@ -95,44 +50,76 @@ export function UserProvider({ children }) {
     }
 
     try {
-      // Clear AsyncStorage progress cache (used by homePage)
       await AsyncStorage.removeItem('progress_cache_v1');
       L.auth('clearAllCachedData() - AsyncStorage progress cache cleared');
     } catch (e) {
       L.err('clearAllCachedData() - error clearing AsyncStorage:', e?.message);
     }
+  };
 
-    try {
-      // Clear session meta if it exists
-      await deleteSessionMeta();
-      L.auth('clearAllCachedData() - session meta cleared');
-    } catch (e) {
-      L.err('clearAllCachedData() - error clearing session meta:', e?.message);
+  const signInWithIdToken = async ({ provider, idToken, rawNonce, fullName }) => {
+    L.auth('signInWithIdToken()', provider);
+
+    let credential;
+    if (provider === 'google') {
+      credential = GoogleAuthProvider.credential(idToken);
+    } else if (provider === 'apple') {
+      const appleProvider = new OAuthProvider('apple.com');
+      credential = appleProvider.credential({ idToken, rawNonce });
+    } else {
+      throw new Error('unsupported_provider');
     }
+
+    const result = await signInWithCredential(auth, credential);
+
+    if (provider === 'apple' && fullName && auth.currentUser?.displayName !== fullName) {
+      try {
+        await updateProfile(auth.currentUser, { displayName: fullName });
+      } catch (e) {
+        L.err('updateProfile failed:', e?.message);
+      }
+    }
+
+    const firebaseUser = result?.user || auth.currentUser;
+    setUser(mapUser(firebaseUser));
+    return result;
   };
 
   const signOut = async () => {
     L.auth('signOut() - starting logout process');
-    
+
     try {
-      // Call backend logout endpoint
-      await logoutThisDevice();
-      L.auth('signOut() - backend logout successful');
+      await firebaseSignOut(auth);
+      L.auth('signOut() - firebase signOut successful');
     } catch (e) {
-      L.err('signOut() - backend logout error (continuing with local cleanup):', e?.message);
+      L.err('signOut() - firebase signOut error (continuing with local cleanup):', e?.message);
     }
-    
-    // Clear all cached data (React Query, AsyncStorage, session meta)
+
     await clearAllCachedData();
-    
-    // Clear in-memory auth state
+
     injectAccessToken(null);
     setUser(null);
-    
+
     L.auth('signOut() - complete, user signed out');
   };
 
-  // Opsiyonel: sadece isme hızlı yama yapmak istersen (status query’si gelene kadar)
+  const deleteAccount = async () => {
+    const current = auth.currentUser;
+    if (!current) throw new Error('no_current_user');
+
+    try {
+      await deleteDoc(doc(db, 'users', current.uid));
+    } catch (e) {
+      L.err('deleteAccount() - error deleting Firestore user doc:', e?.message);
+    }
+
+    await deleteUser(current);
+    await clearAllCachedData();
+
+    injectAccessToken(null);
+    setUser(null);
+  };
+
   const setUsername = (name) => {
     setUser((prev) => {
       const u = prev || {};
@@ -140,27 +127,37 @@ export function UserProvider({ children }) {
     });
   };
 
-  // --- Effects ---
   useEffect(() => {
-    // Axios 401 (invalid/expired ve refresh de başarısız) → global signOut
-    bindOnUnauthorized(signOut);
-    // App açılışında sessiz hydrate
-    hydrate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const token = await firebaseUser.getIdToken();
+          injectAccessToken(token);
+        } catch (e) {
+          L.err('onIdTokenChanged getIdToken error:', e?.message);
+          injectAccessToken(null);
+        }
+        setUser(mapUser(firebaseUser));
+      } else {
+        injectAccessToken(null);
+        setUser(null);
+      }
+
+      setIsHydrated(true);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const value = useMemo(
     () => ({
-      // state
       isHydrated,
       accessToken,
       user,
-
-      // actions
-      hydrate,
       signInWithIdToken,
       signOut,
-      setUsername, // opsiyonel
+      deleteAccount,
+      setUsername,
     }),
     [isHydrated, accessToken, user]
   );

@@ -10,7 +10,6 @@ import {
   Platform,
   Linking,
 } from 'react-native';
-import { deleteAccount } from '../../api/bac/authservice';
 import { useUser } from '../../contexts/UserContext';
 import { colors, spacing, typography } from '../../utils/Theme';
 import { getLocal } from '../../api/local';
@@ -21,7 +20,7 @@ import ActionsList from '../../component/profile/ActionsList';
 import useStatus from '../../hooks/status';
 
 const ProfileScreen = ({ navigation }) => {
-  const { signOut } = useUser();
+  const { signOut, deleteAccount } = useUser();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profile, setProfile] = useState({ name: '', email: '' });

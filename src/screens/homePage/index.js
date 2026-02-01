@@ -8,7 +8,6 @@ import {
   Text,
   ActivityIndicator,
   Button,
-  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
@@ -28,7 +27,7 @@ import { days } from "../../data/home";
 import { useUser } from "../../contexts/UserContext";
 
 // API
-import { getProgress as getProgressApi } from "../../api/bac/statusservice";
+import { getProgress as getProgressApi } from "../../api/firebase/progress";
 
 // -------------------- Normalize --------------------
 /**
@@ -79,7 +78,6 @@ const normalizeProgress = (raw) => {
           grammar: grammarStatus,
           feedback: feedbackStatus,
         },
-        speaking_started: !!steps?.speaking?.started,
       };
     });
   } else {
@@ -93,7 +91,6 @@ const normalizeProgress = (raw) => {
           grammar: d?.steps?.grammar ?? "locked",
           feedback: d?.steps?.feedback ?? "locked",
         },
-        speaking_started: !!d?.steps?.speaking?.started,
       };
     });
   }
@@ -105,7 +102,7 @@ const CACHE_KEY = "progress_cache_v1";
 
 // -------------------- Screen --------------------
 const HomeDashboardScreen = ({ navigation }) => {
-  const { user, accessToken } = useUser();
+  const { user } = useUser();
 
   // Yerel cache (ilk boyama için)
   const [cachedProgress, setCachedProgress] = useState(null);
@@ -166,9 +163,9 @@ const HomeDashboardScreen = ({ navigation }) => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["progress"],
-    queryFn: async () => normalizeProgress(await getProgressApi()),
-    enabled: !!accessToken, // auth yoksa sorgulama
+    queryKey: ["progress", user?.uid],
+    queryFn: async () => normalizeProgress(await getProgressApi(user?.uid)),
+    enabled: !!user?.uid, // auth yoksa sorgulama
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
@@ -179,8 +176,8 @@ const HomeDashboardScreen = ({ navigation }) => {
   // Odaklanınca refetch
   useFocusEffect(
     useCallback(() => {
-      if (accessToken) refetch();
-    }, [accessToken, refetch])
+      if (user?.uid) refetch();
+    }, [user?.uid, refetch])
   );
 
   // Query başarılı olunca cache’e yaz
@@ -205,28 +202,19 @@ const HomeDashboardScreen = ({ navigation }) => {
     [progress]
   );
 
-  const getSpeakingStarted = useCallback(
-    (dayId) => !!progress?.days?.[dayId]?.speaking_started,
-    [progress]
-  );
-
   const buttonTextForDay = useCallback(
     (dayId, step = "speaking") => {
       const stepStatus = getStepStatus(dayId, step);
       if (stepStatus === "completed") return "Completed ✅";
       if (stepStatus === "locked") return "Locked 🔒";
-      if (step === "speaking") {
-        return getSpeakingStarted(dayId) ? "Continue" : "Start";
-      }
       return "Continue Learning";
     },
-    [getSpeakingStarted, getStepStatus]
+    [getStepStatus]
   );
 
   const handlePress = useCallback(
     (dayId, step) => {
       const status = getStepStatus(dayId, step);
-      const speakingStarted = getSpeakingStarted(dayId);
       
       // Allow navigation if:
       // 1. Step is in_progress, OR
@@ -255,38 +243,6 @@ const HomeDashboardScreen = ({ navigation }) => {
       }
 
       if (target) {
-        if (step === "speaking" && speakingStarted && status !== "completed") {
-          Alert.alert(
-            "You already started this speaking exam.",
-            "",
-            [
-              {
-                text: "Continue from where you left off",
-                onPress: () =>
-                  navigation.navigate(target, {
-                    dayId,
-                    dayNumber: dayId, // day_id için de kullanılacak
-                    step,
-                    resume: true,
-                  }),
-              },
-              {
-                text: "Start from the beginning",
-                style: "destructive",
-                onPress: () =>
-                  navigation.navigate(target, {
-                    dayId,
-                    dayNumber: dayId, // day_id için de kullanılacak
-                    step,
-                    resume: false,
-                  }),
-              },
-            ],
-            { cancelable: true }
-          );
-          return;
-        }
-
         navigation.navigate(target, {
           dayId,
           dayNumber: dayId, // day_id için de kullanılacak
@@ -294,7 +250,7 @@ const HomeDashboardScreen = ({ navigation }) => {
         });
       }
     },
-    [getSpeakingStarted, getStepStatus, navigation, progress]
+    [getStepStatus, navigation, progress]
   );
 
   // renderItem (hook: koşullu returnlardan ÖNCE tanımlı)

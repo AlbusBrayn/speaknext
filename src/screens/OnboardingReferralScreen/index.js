@@ -12,8 +12,8 @@ import { L } from '../../utils/logger';
 
 
 import { useUser } from '../../contexts/UserContext';
-import Service from '../../api/bac'; // axios instance
 import { saveLocal } from '../../api/local';
+import { setOnboardingData, setProfileCompleted, upsertUserDoc } from '../../api/firebase/users';
 
 const USER_PROFILE_CACHE_KEY = 'user_profile_v1';
 
@@ -39,46 +39,39 @@ const OnboardingReferralScreen = () => {
     [paramName, user?.name]
   );
 
-  // /profile isteği YALNIZCA burada atılır
   const completeProfileMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        name: finalName,               // ✅ Name burada kullanılıyor
-        age: '18_24',                  // TODO: ileride adım 2'den al
-        referral_source: 'friend', // canonical
-        exam_type: 'ielts',
-        level: 'intermediate',         // TODO: ileride adım 2'den al
+        name: finalName,
+        referral_source: selectedReferral,
       };
-          L.ob('POST /profile payload:', payload);
-          return Service.post('/profile', payload);
-        },
+      if (user?.uid) {
+        await upsertUserDoc(user.uid, { user_name: finalName });
+        await setOnboardingData(user.uid, payload);
+        await setProfileCompleted(user.uid, true);
+      }
+      return payload;
+    },
     onSuccess: async (res) => {
-          L.ob('POST /profile response:', res?.data);
-
-      const serverUser = res?.data?.user || {};
-      const serverName = serverUser?.name ?? res?.data?.name;
-      const serverEmail = serverUser?.email ?? res?.data?.email;
-
-      if (serverName || serverEmail) {
+      const serverName = res?.name || finalName;
+      if (serverName) {
         await saveLocal(USER_PROFILE_CACHE_KEY, {
           name: serverName ?? null,
-          email: serverEmail ?? null,
+          email: null,
         });
+        setUsername(serverName);
       }
 
-      // 1) Context'teki geçici adı backend'in normalize ettiği isimle güncelle
-      if (serverName) setUsername(serverName);
-
       // 2) Status cache → optimistic güncelle
-      qc.setQueryData(['status'], (old) => ({
+      qc.setQueryData(['status', user?.uid], (old) => ({
         ...(old || {}),
         is_profile_completed: true,
         user_name: serverName ?? old?.user_name ?? finalName,
       }));
 
       // 3) Kesin senkron için invalidate (RootNavigator yönlendirecek)
-          await qc.invalidateQueries({ queryKey: ['status'] });
-          const latestStatus = await qc.fetchQuery({ queryKey: ['status'] });
+      await qc.invalidateQueries({ queryKey: ['status', user?.uid] });
+      const latestStatus = await qc.fetchQuery({ queryKey: ['status', user?.uid] });
           L.st('[after /profile] latest status:', latestStatus);
           if (!latestStatus?.is_profile_completed) {
            L.st('[WARN] backend still says is_profile_completed=false');

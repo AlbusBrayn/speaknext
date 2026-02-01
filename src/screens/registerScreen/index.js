@@ -12,12 +12,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 
 // UI
 import Logo from '../../component/registerScreen/logo';
@@ -34,7 +34,6 @@ import { useUser } from '../../contexts/UserContext';
 WebBrowser.maybeCompleteAuthSession(); // web redirect cleanup
 
 const LoginScreen = () => {
-  const navigation = useNavigation();
   const qc = useQueryClient();
   const { signInWithIdToken } = useUser();
 
@@ -68,15 +67,16 @@ const LoginScreen = () => {
 
   // Apple → Context üzerinden sign-in
   const appleLoginMutation = useMutation({
-    mutationFn: async (idToken) => {
-          const data = await signInWithIdToken({ provider: 'apple', idToken });
-          return data;    },
-          onSuccess: async (data) => {
-          L.auth('[Apple] /apple/login response:', data);   
-           await qc.invalidateQueries({ queryKey: ['status'] });
+    mutationFn: async ({ idToken, rawNonce, fullName }) => {
+      const data = await signInWithIdToken({ provider: 'apple', idToken, rawNonce, fullName });
+      return data;
+    },
+    onSuccess: async (data) => {
+      L.auth('[Apple] Firebase sign-in response:', data);
+      await qc.invalidateQueries({ queryKey: ['status'] });
       await qc.invalidateQueries({ queryKey: ['progress'] });
       const latestStatus = await qc.fetchQuery({ queryKey: ['status'] });
-    L.st('[Apple] latest status:', latestStatus);
+      L.st('[Apple] latest status:', latestStatus);
     },
     onError: (error) => {
       console.log('Apple login failed:', error?.response?.data || error?.message);
@@ -108,16 +108,29 @@ const LoginScreen = () => {
 
   const handleAppleSignIn = async () => {
     try {
+      const rawNonce = Array.from({ length: 32 }, () =>
+        Math.floor(Math.random() * 36).toString(36)
+      ).join('');
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce
+      );
+
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce: hashedNonce,
       });
 
       const idToken = credential?.identityToken;
       if (idToken) {
-        appleLoginMutation.mutate(idToken);
+        const fullName = [credential?.fullName?.givenName, credential?.fullName?.familyName]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+        appleLoginMutation.mutate({ idToken, rawNonce, fullName: fullName || null });
       } else {
         console.log('Apple → identityToken boş geldi');
       }

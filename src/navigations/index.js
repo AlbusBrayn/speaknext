@@ -15,7 +15,7 @@ import BlankSplash from '../screens/BlankSplash';
 
 export default function RootNavigator() {
   // ---- Auth (yalnızca kimlik & token) ----
-  const { isHydrated, accessToken } = useUser();
+  const { isHydrated, user } = useUser();
 
   // ---- Status (profil/abonelik gating) ----
   const {
@@ -33,8 +33,8 @@ export default function RootNavigator() {
   }
 
   // 2) Auth yoksa → Auth flow (status hook zaten disabled olur)
-  if (!accessToken) {
-    L.nav('state: no accessToken → AuthNavigator');
+  if (!user) {
+    L.nav('state: no user → AuthNavigator');
     return (
       <NavigationContainer>
         <AuthNavigator />
