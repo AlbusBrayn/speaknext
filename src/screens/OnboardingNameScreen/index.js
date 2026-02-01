@@ -14,12 +14,11 @@ import NameInput from '../../component/OnboardingNameScreen/NameInput';
 import ContinueButton from '../../component/OnboardingNameScreen/ContinueButton';
 
 import { useUser } from '../../contexts/UserContext';
-import { upsertUserDoc } from '../../api/firebase/users';
 
 const OnboardingNameScreen = ({ navigation }) => {
   const [name, setName] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const { setUsername, user } = useUser(); // ✅ setUser değil, setUsername
+  const { setUsername } = useUser(); // ✅ setUser değil, setUsername
 
   const handleNameChange = (text) => {
     const trimmed = text.trim();
@@ -37,19 +36,12 @@ const OnboardingNameScreen = ({ navigation }) => {
     setName(words.slice(0, 30).join(' '));
   };
 
-  const handleContinue = async () => {
+  const handleContinue = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
 
     // 1) Geçici olarak Context'e yaz (UI selamlama vs. için)
     setUsername(trimmed);
-
-    // 1.5) Firestore'a yaz
-    if (user?.uid) {
-      try {
-        await upsertUserDoc(user.uid, { user_name: trimmed });
-      } catch {}
-    }
 
     // 2) Bir sonraki ekrana param olarak da taşı (çifte güvence)
     navigation.navigate('OnboardingEnglishLevelScreen', { name: trimmed });

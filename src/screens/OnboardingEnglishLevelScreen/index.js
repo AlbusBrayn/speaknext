@@ -4,13 +4,13 @@ import HeaderSection from '../../component/OnboardingEnglishLevelScreen/HeaderSe
 import LevelOption from '../../component/OnboardingEnglishLevelScreen/LevelOption';
 import ContinueButton from '../../component/OnboardingEnglishLevelScreen/ContinueButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useUser } from '../../contexts/UserContext';
-import { setOnboardingData } from '../../api/firebase/users';
+import { useRoute } from '@react-navigation/native';
 
 
 const OnboardingEnglishLevelScreen = ({ navigation }) => {
   const [selectedLevel, setSelectedLevel] = useState(null);
-  const { user } = useUser();
+  const route = useRoute();
+  const name = route?.params?.name;
 
   const levels = [
     { value: 'Beginner', title: 'Beginner', description: "I'm just starting to learn English" },
@@ -18,15 +18,13 @@ const OnboardingEnglishLevelScreen = ({ navigation }) => {
     { value: 'Advanced', title: 'Advanced', description: "I'm comfortable speaking fluently" },
   ];
 
-  const handleContinue = async () => {
+  const handleContinue = () => {
     if (selectedLevel) {
       console.log('Selected Level:', selectedLevel);
-      if (user?.uid) {
-        try {
-          await setOnboardingData(user.uid, { english_level: selectedLevel });
-        } catch {}
-      }
-      navigation.navigate('OnboardingReferralScreen'); // test amaçlı
+      navigation.navigate('OnboardingReferralScreen', {
+        name,
+        english_level: selectedLevel,
+      });
     }
   };
 

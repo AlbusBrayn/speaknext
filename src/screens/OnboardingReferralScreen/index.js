@@ -34,6 +34,7 @@ const OnboardingReferralScreen = () => {
   // Ad'ı önce route param’dan, yoksa Context’ten çek
   const { user, setUsername } = useUser();
   const paramName = route?.params?.name;
+  const paramLevel = route?.params?.english_level;
   const finalName = useMemo(
     () => (paramName?.trim?.() || user?.name?.trim?.() || 'Guest'),
     [paramName, user?.name]
@@ -44,6 +45,7 @@ const OnboardingReferralScreen = () => {
       const payload = {
         name: finalName,
         referral_source: selectedReferral,
+        english_level: paramLevel || null,
       };
       if (user?.uid) {
         await upsertUserDoc(user.uid, { user_name: finalName });

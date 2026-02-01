@@ -28,7 +28,14 @@ export async function setProfileCompleted(uid, isCompleted) {
 }
 
 export async function setOnboardingData(uid, data) {
-  return upsertUserDoc(uid, {
-    onboarding: data,
+  if (!uid) throw new Error('missing_uid');
+  const ref = doc(db, 'users', uid);
+  const payload = {};
+  Object.keys(data || {}).forEach((key) => {
+    payload[`onboarding.${key}`] = data[key];
   });
+  payload.user_id = uid;
+  payload.updated_at = serverTimestamp();
+  await setDoc(ref, payload, { merge: true });
+  return payload;
 }

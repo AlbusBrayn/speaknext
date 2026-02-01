@@ -67,7 +67,7 @@ export function useStartStep() {
 
   return useMutation({
     mutationFn: async ({ day_number, step }) =>
-      updateProgress(user?.uid, { day_number, step, outcome: 'started' }),
+      updateProgress(user?.uid, { day_number, step, outcome: 'in_progress' }),
     onMutate: async (vars) => {
       await qc.cancelQueries(key);
       const previous = qc.getQueryData(key);
